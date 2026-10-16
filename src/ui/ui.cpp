@@ -11,6 +11,9 @@
 #include "novel_list.h"
 #include "novel_reader_ui.h"
 #include "reader/novel.h"
+#include "game_menu.h"
+#include "game/game_2048.h"
+#include "game/muyu.h"
 #include "hardware/display.h"
 #include "hardware/battery.h"
 #include "hardware/audio.h"
@@ -138,6 +141,15 @@ void ui_switch_to(UIPage page) {
     case UI_PAGE_NOVEL_READER:
       novel_reader_ui_enter();
       break;
+    case UI_PAGE_GAME_MENU:
+      game_menu_enter();
+      break;
+    case UI_PAGE_GAME_2048:
+      game_2048_enter();
+      break;
+    case UI_PAGE_MUYU:
+      muyu_enter();
+      break;
     default:
       break;
   }
@@ -183,6 +195,15 @@ void ui_update() {
       break;
     case UI_PAGE_NOVEL_READER:
       novel_reader_ui_update();
+      break;
+    case UI_PAGE_GAME_MENU:
+      game_menu_update();
+      break;
+    case UI_PAGE_GAME_2048:
+      game_2048_update();
+      break;
+    case UI_PAGE_MUYU:
+      muyu_update();
       break;
     default:
       break;
@@ -234,6 +255,15 @@ void ui_handle_touch(int16_t x, int16_t y) {
     case UI_PAGE_NOVEL_READER:
       novel_reader_ui_handle_touch(x, y);
       break;
+    case UI_PAGE_GAME_MENU:
+      game_menu_handle_touch(x, y);
+      break;
+    case UI_PAGE_GAME_2048:
+      game_2048_handle_touch(x, y);
+      break;
+    case UI_PAGE_MUYU:
+      muyu_handle_touch(x, y);
+      break;
     default:
       break;
   }
@@ -262,6 +292,14 @@ void ui_handle_button_click() {
     } else {
       display_sleep();
     }
+  } else if (s_currentPage == UI_PAGE_GAME_2048 || s_currentPage == UI_PAGE_MUYU) {
+    LOG_UI("游戏中短按 BOOT -> 返回摸鱼大厅");
+    audio_test_beep(1000, 40);
+    ui_switch_to(UI_PAGE_GAME_MENU);
+  } else if (s_currentPage == UI_PAGE_GAME_MENU) {
+    LOG_UI("摸鱼大厅短按 BOOT -> 返回主页");
+    audio_test_beep(1000, 40);
+    ui_switch_to(UI_PAGE_HOME);
   } else if (s_currentPage == UI_PAGE_NOVEL_READER) {
     LOG_UI("小说阅读中短按 BOOT -> 返回书架");
     audio_test_beep(1000, 40);

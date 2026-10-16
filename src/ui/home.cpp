@@ -105,13 +105,13 @@ void home_enter() {
     font_draw_string(x + 12, y + 26, "参数与硬件管理", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
   }
 
-  // 卡片 5: 触控校准 (Row 2, Col 1: x=166, y=141, w=140, h=48)
+  // 卡片 5: 摸鱼大厅 / 经典游戏 (Row 2, Col 1: x=166, y=141, w=140, h=48)
   {
     int16_t x = 166, y = 141, w = 140, h = 48;
     tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
-    tft.drawRoundRect(x, y, w, h, 6, 0xD01F);
-    font_draw_string(x + 12, y + 7, "触控校准", 0xD01F, COLOR_PANEL_BG, 1);
-    font_draw_string(x + 12, y + 26, "屏幕精准校准", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+    tft.drawRoundRect(x, y, w, h, 6, 0xFD20);
+    font_draw_string(x + 12, y + 7, "摸鱼大厅", 0xFD20, COLOR_PANEL_BG, 1);
+    font_draw_string(x + 12, y + 26, "2048 / 电子木鱼", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
   }
 
   // 底部状态栏横幅 (x: 14, y: 194, w: 292, h: 36)
@@ -172,7 +172,7 @@ void home_handle_touch(int16_t x, int16_t y) {
     } else if (y < 139) {
       ui_switch_to(UI_PAGE_RECENT_LIST);  // 右中: 最近播放
     } else {
-      ui_switch_to(UI_PAGE_TOUCH_CAL);    // 右下: 触控精准校准
+      ui_switch_to(UI_PAGE_GAME_MENU);    // 右下: 摸鱼大厅 (2048 / 木鱼)
     }
   }
 }
