@@ -272,8 +272,9 @@ void ui_handle_touch(int16_t x, int16_t y) {
 void ui_handle_button_click() {
   LOG_UI("实体按键 BOOT 单击");
   if (s_currentPage == UI_PAGE_PLAYER) {
-    player_toggle();
-    player_ui_enter();
+    LOG_UI("播放器中短按 BOOT -> 返回主页");
+    audio_test_beep(1000, 40);
+    ui_switch_to(UI_PAGE_HOME);
   } else if (s_currentPage == UI_PAGE_HOME) {
     // 在主页单击直接进入触屏精准校准！
     LOG_UI("主页单击 BOOT -> 直达触屏校准");

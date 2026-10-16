@@ -1,6 +1,7 @@
 #include "touch.h"
 #include <Preferences.h>
 #include <math.h>
+#include <driver/dac.h>
 
 static Preferences s_prefs;
 static TouchCalibrationCoeffs s_cal;
@@ -154,6 +155,8 @@ void touch_save_calibration() {
 
 void touch_init() {
   LOG_TOUCH("初始化 XPT2046 触摸驱动 (PaulStoffregen抗串扰时序+最强besttwoavg去噪)...");
+  // 硬件保护：彻底关闭 DAC1，防止任何音频库初始化意外占领 GPIO 25 (TOUCH_SCK)
+  dac_output_disable(DAC_CHANNEL_1);
   pinMode(TOUCH_SCK_PIN, OUTPUT);
   pinMode(TOUCH_MOSI_PIN, OUTPUT);
   pinMode(TOUCH_MISO_PIN, INPUT);
@@ -211,6 +214,8 @@ bool touch_read_raw(uint16_t &outRawX, uint16_t &outRawY, uint16_t &outRawZ) {
     return false;
   }
 
+  // 防御性保障：确保 TOUCH_SCK_PIN 处于数字输出状态
+  pinMode(TOUCH_SCK_PIN, OUTPUT);
   digitalWrite(TOUCH_CS_PIN, LOW);
 
   // 1) Z 压力检测
