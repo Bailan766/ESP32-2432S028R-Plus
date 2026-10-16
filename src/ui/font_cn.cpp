@@ -8052,7 +8052,15 @@ void font_draw_string(int16_t x, int16_t y, const char* utf8_str, uint16_t color
         p++;
       }
     } else if ((*p & 0xE0) == 0xC0) {
-      p += 2;
+      if (*(p + 1)) {
+        uint16_t unicode = (((uint16_t)(*p & 0x1F)) << 6) |
+                           ((uint16_t)(*(p + 1) & 0x3F));
+        font_draw_char(curX, y, unicode, color, bg, scale);
+        curX += 16 * scale;
+        p += 2;
+      } else {
+        p++;
+      }
     } else {
       p++;
     }
@@ -8069,6 +8077,9 @@ int16_t font_get_string_width(const char* utf8_str, uint8_t scale) {
     } else if ((*p & 0xE0) == 0xE0) {
       w += 16 * scale;
       p += 3;
+    } else if ((*p & 0xE0) == 0xC0) {
+      w += 16 * scale;
+      p += 2;
     } else {
       p++;
     }

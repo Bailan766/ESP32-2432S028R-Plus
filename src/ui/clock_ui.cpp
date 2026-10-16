@@ -80,13 +80,14 @@ static void renderClockDashboard() {
 
   const WeatherInfo& winfo = weather_get_info();
   if (winfo.valid) {
-    // 气温大字
-    font_draw_string(24, 118, winfo.temp, COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 2);
-    // 天气状况与湿度
-    font_draw_string(118, 122, winfo.desc, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
-    font_draw_string(118, 144, winfo.humidity, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+    // 气温 (大字 32px 高度)
+    font_draw_string(24, 124, winfo.temp, COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 2);
     // 城市
-    font_draw_string(210, 134, winfo.city, COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+    font_draw_string(120, 120, winfo.city, COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+    // 天气状况
+    font_draw_string(120, 144, winfo.desc, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
+    // 湿度
+    font_draw_string(186, 144, winfo.humidity, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
   } else {
     font_draw_string(24, 124, "实时天气: 待获取", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
     if (WiFi.status() == WL_CONNECTED) {
@@ -151,6 +152,7 @@ void clock_ui_handle_touch(int16_t x, int16_t y) {
   // 1. 天气卡片点击刷新 (x: 250..300, y: 110..172)
   if (x >= 250 && x <= 300 && y >= 110 && y <= 172) {
     audio_test_beep(1500, 40);
+    font_draw_string_center(279, 133, "同步", COLOR_ACCENT_GREEN, 0x2124, 1);
     weather_fetch();
     renderClockDashboard();
     return;
