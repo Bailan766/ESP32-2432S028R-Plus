@@ -46,9 +46,13 @@ void ui_draw_header(const char* title, bool showBackBtn) {
 
   // 电池电量数值与小图标 (右侧)
   char bBuf[16];
-  snprintf(bBuf, sizeof(bBuf), "%.2fV", battery_get_voltage());
+  if (battery_is_usb_powered()) {
+    strcpy(bBuf, "USB 5V");
+  } else {
+    snprintf(bBuf, sizeof(bBuf), "%.2fV", battery_get_voltage());
+  }
   tft.setTextColor(battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN, COLOR_BG_DARK);
-  tft.drawString(bBuf, 226, 8, 1);
+  tft.drawString(bBuf, 224, 8, 1);
 
   int bx = 276, by = 8, bw = 30, bh = 14;
   tft.drawRect(bx, by, bw, bh, COLOR_TEXT_PRIMARY);
@@ -209,16 +213,20 @@ void ui_update() {
       break;
   }
 
-  // 每 2 秒微刷新一次头部电量指示
+  // 每 2 秒微刷新一次通用头部电量指示 (仅在采用通用头部的页面刷新，防干扰锁屏大时钟与无头界面)
   if (millis() - s_lastHeaderRefresh >= 2000) {
     s_lastHeaderRefresh = millis();
-    int bx = 276, by = 8, bw = 30, bh = 14;
+    if (s_currentPage != UI_PAGE_LOCKSCREEN && 
+        s_currentPage != UI_PAGE_SPLASH && 
+        s_currentPage != UI_PAGE_TOUCH_CAL) {
+      int bx = 276, by = 8, bw = 30, bh = 14;
     TFT_eSPI& tft = display_get_tft();
     int fillW = map(battery_get_percent(), 0, 100, 0, bw - 4);
     fillW = constrain(fillW, 0, bw - 4);
     uint16_t bCol = battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN;
     tft.fillRect(bx + 2, by + 2, fillW, bh - 4, bCol);
     tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, COLOR_BG_DARK);
+    }
   }
 }
 

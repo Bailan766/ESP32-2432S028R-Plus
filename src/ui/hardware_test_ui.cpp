@@ -71,13 +71,16 @@ static void updateDynamicData() {
   font_draw_string(14, 162, "BOOT 按键 (IO 0):", COLOR_TEXT_PRIMARY, COLOR_BG_DARK, 1);
   font_draw_string(170, 162, bootPressed ? "[按下 PRESSED]" : "[松开 RELEASED]", bootPressed ? TFT_GREEN : COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
 
-  // 电池 ADC 与电压
+  // 电池 ADC 与电压 / 光敏照度
   int rawAdc = battery_get_raw_adc();
-  float volt = battery_get_voltage();
-  font_draw_string(14, 184, "电池采样 (IO 34):", COLOR_TEXT_PRIMARY, COLOR_BG_DARK, 1);
+  font_draw_string(14, 184, "光敏/电源 (IO 34):", COLOR_TEXT_PRIMARY, COLOR_BG_DARK, 1);
   char bBuf[48];
-  snprintf(bBuf, sizeof(bBuf), "ADC:%4d | %.2f V (%d%%)", rawAdc, volt, battery_get_percent());
-  font_draw_string(150, 184, bBuf, COLOR_ACCENT_GREEN, COLOR_BG_DARK, 1);
+  if (battery_is_usb_powered()) {
+    snprintf(bBuf, sizeof(bBuf), "照度:%d%% (ADC:%4d)|USB 5V", battery_get_light_percent(), rawAdc);
+  } else {
+    snprintf(bBuf, sizeof(bBuf), "ADC:%4d | %.2f V (%d%%)", rawAdc, battery_get_voltage(), battery_get_percent());
+  }
+  font_draw_string(138, 184, bBuf, COLOR_ACCENT_GREEN, COLOR_BG_DARK, 1);
 
   // 实时触摸坐标
   uint16_t rX = 0, rY = 0, rZ1 = 0;

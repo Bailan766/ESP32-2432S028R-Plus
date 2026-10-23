@@ -30,11 +30,11 @@ static void renderClockDashboard() {
   TFT_eSPI& tft = display_get_tft();
   tft.fillScreen(COLOR_BG_DARK);
 
-  // 1. 顶部状态栏 (高度 24px)
+  // 1. 顶部状态栏 (高度 24px, 底色 0x10A2)
   tft.fillRect(0, 0, 320, 24, 0x10A2);
   tft.drawLine(0, 24, 320, 24, COLOR_PANEL_BORDER);
 
-  // WiFi 状态
+  // WiFi 状态 (左侧)
   if (WiFi.status() == WL_CONNECTED) {
     char ipBuf[32];
     snprintf(ipBuf, sizeof(ipBuf), "WiFi: %s", WiFi.localIP().toString().c_str());
@@ -43,10 +43,24 @@ static void renderClockDashboard() {
     font_draw_string(8, 4, "WiFi: 未连接 (可点下方配网)", COLOR_TEXT_MUTED, 0x10A2, 1);
   }
 
-  // 电池电压
+  // 电源与电池状态指示 (右侧)
   char bBuf[16];
-  snprintf(bBuf, sizeof(bBuf), "%.2fV", battery_get_voltage());
-  font_draw_string(270, 4, bBuf, COLOR_ACCENT_CYAN, 0x10A2, 1);
+  if (battery_is_usb_powered()) {
+    strcpy(bBuf, "USB 5V");
+  } else {
+    snprintf(bBuf, sizeof(bBuf), "%.2fV", battery_get_voltage());
+  }
+  font_draw_string(216, 4, bBuf, COLOR_ACCENT_CYAN, 0x10A2, 1);
+
+  // 电池外框与填充条 (右侧: bx=276, by=5, bw=30, bh=14)
+  int bx = 276, by = 5, bw = 30, bh = 14;
+  tft.drawRect(bx, by, bw, bh, COLOR_TEXT_PRIMARY);
+  tft.fillRect(bx + bw, by + 4, 3, 6, COLOR_TEXT_PRIMARY);
+  int fillW = map(battery_get_percent(), 0, 100, 0, bw - 4);
+  fillW = constrain(fillW, 0, bw - 4);
+  uint16_t bCol = battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN;
+  tft.fillRect(bx + 2, by + 2, fillW, bh - 4, bCol);
+  tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, 0x10A2);
 
   // 2. 超大实时数字时钟与日期
   struct tm timeinfo;
@@ -80,26 +94,34 @@ static void renderClockDashboard() {
 
   const WeatherInfo& winfo = weather_get_info();
   if (winfo.valid) {
-    // 气温 (大字 32px 高度)
-    font_draw_string(24, 124, winfo.temp, COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 2);
-    // 城市
-    font_draw_string(120, 120, winfo.city, COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
-    // 天气状况
-    font_draw_string(120, 144, winfo.desc, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
-    // 湿度
-    font_draw_string(186, 144, winfo.humidity, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
-  } else {
-    font_draw_string(24, 124, "实时天气: 待获取", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
-    if (WiFi.status() == WL_CONNECTED) {
-      font_draw_string(24, 146, "点击右侧刷新获取当前天气", COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+    // 气温 (左侧醒目展示, 大号 32px 高度, scale 2)
+    font_draw_string(22, 124, winfo.temp, COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 2);
+
+    // 第一行: 城市 与 天气状况 (y: 120)
+    font_draw_string(96, 120, winfo.city, COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+    font_draw_string(156, 120, winfo.desc, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
+
+    // 第二行: 湿度信息 (y: 144)
+    char humBuf[32];
+    if (strstr(winfo.humidity, "湿度")) {
+      snprintf(humBuf, sizeof(humBuf), "%s", winfo.humidity);
     } else {
-      font_draw_string(24, 146, "连接 WiFi 后自动同步全国天气", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+      snprintf(humBuf, sizeof(humBuf), "湿度: %s", winfo.humidity);
+    }
+    font_draw_string(96, 144, humBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  } else {
+    if (WiFi.status() == WL_CONNECTED) {
+      font_draw_string(24, 124, "富平县 (同步天气中...)", COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+      font_draw_string(24, 146, "点击右侧[刷新]重试同步", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+    } else {
+      font_draw_string(24, 124, "富平县 (Wi-Fi 未连接)", COLOR_ACCENT_ORANGE, COLOR_PANEL_BG, 1);
+      font_draw_string(24, 146, "请点击下方 [WiFi配网]", COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
     }
   }
 
-  // 天气卡片右侧刷新按钮图标 (x: 260, y: 116, w: 38, h: 50)
-  tft.fillRoundRect(260, 118, 38, 46, 4, 0x2124);
-  tft.drawRoundRect(260, 118, 38, 46, 4, COLOR_PANEL_BORDER);
+  // 天气卡片右侧刷新按钮图标 (x: 258, y: 118, w: 42, h: 46)
+  tft.fillRoundRect(258, 118, 42, 46, 4, 0x2124);
+  tft.drawRoundRect(258, 118, 42, 46, 4, COLOR_PANEL_BORDER);
   font_draw_string_center(279, 133, "刷新", COLOR_TEXT_PRIMARY, 0x2124, 1);
 
   // 4. 底部三大快捷功能按键 (y: 182, h: 46)
@@ -149,9 +171,15 @@ void clock_ui_update() {
 }
 
 void clock_ui_handle_touch(int16_t x, int16_t y) {
-  // 1. 天气卡片点击刷新 (x: 250..300, y: 110..172)
-  if (x >= 250 && x <= 300 && y >= 110 && y <= 172) {
+  // 1. 天气卡片点击刷新 (x: 250..305, y: 110..172)
+  if (x >= 250 && x <= 305 && y >= 110 && y <= 172) {
     audio_test_beep(1500, 40);
+    if (WiFi.status() != WL_CONNECTED) {
+      TFT_eSPI& tft = display_get_tft();
+      tft.fillRect(24, 144, 230, 20, COLOR_PANEL_BG);
+      font_draw_string(24, 146, "请先点击下方[WiFi配网]!", TFT_RED, COLOR_PANEL_BG, 1);
+      return;
+    }
     font_draw_string_center(279, 133, "同步", COLOR_ACCENT_GREEN, 0x2124, 1);
     weather_fetch();
     renderClockDashboard();

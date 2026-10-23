@@ -366,9 +366,13 @@ void novel_render_current_page() {
     font_draw_string(8, 3, titleBuf, tc.text, tc.status_bg, 1);
   }
 
-  // 顶部右侧：阅读进度百分比与电池电压
+  // 顶部右侧：阅读进度百分比与电池/电源状态
   char progBuf[32];
-  snprintf(progBuf, sizeof(progBuf), "%.1f%%  %.2fV", novel_get_progress_percent(), battery_get_voltage());
+  if (battery_is_usb_powered()) {
+    snprintf(progBuf, sizeof(progBuf), "%.1f%%  USB", novel_get_progress_percent());
+  } else {
+    snprintf(progBuf, sizeof(progBuf), "%.1f%%  %.2fV", novel_get_progress_percent(), battery_get_voltage());
+  }
   int16_t pw = font_get_string_width(progBuf, 1);
   font_draw_string(312 - pw, 3, progBuf, tc.accent, tc.status_bg, 1);
 
