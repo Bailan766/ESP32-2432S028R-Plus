@@ -45,14 +45,10 @@ void ui_draw_header(const char* title, bool showBackBtn) {
   font_draw_string(showBackBtn ? 78 : 10, 7, title, COLOR_TEXT_PRIMARY, COLOR_BG_DARK, 1);
 
   // 电池电量数值与小图标 (右侧)
-  char bBuf[16];
-  if (battery_is_usb_powered()) {
-    strcpy(bBuf, "USB 5V");
-  } else {
-    snprintf(bBuf, sizeof(bBuf), "%.2fV", battery_get_voltage());
-  }
+  char bBuf[24];
+  snprintf(bBuf, sizeof(bBuf), "%d%% %.2fV", battery_get_percent(), battery_get_voltage());
   tft.setTextColor(battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN, COLOR_BG_DARK);
-  tft.drawString(bBuf, 224, 8, 1);
+  tft.drawString(bBuf, 194, 8, 1);
 
   int bx = 276, by = 8, bw = 30, bh = 14;
   tft.drawRect(bx, by, bw, bh, COLOR_TEXT_PRIMARY);

@@ -1,67 +1,87 @@
 #include "battery.h"
 
-// 默认 USB 供电模式 (CYD 开发板标准供电方式为 Type-C / 5V)
-static bool s_isUsbPowered = true;
-static float s_batteryVoltage = 5.00f;
-static uint8_t s_batteryPercent = 100;
+static float s_batteryVoltage = 3.85f; // 初始锂电池标称电压估算
+static uint8_t s_batteryPercent = 70;
 static int s_rawAdc = 0;
-static int s_lightPercent = 50;
 static unsigned long s_lastSampleTime = 0;
 
-// 锂电池典型放电非线性映射函数 (精确到 5%)
+// 锂电池典型放电非线性分段线性插值 (基于 3.7V/4.2V 单节锂电池放电特性曲线)
 static uint8_t calcLipoPercent(float v) {
-  if (v >= 4.18f) return 100;
-  if (v >= 4.08f) return 90;
-  if (v >= 3.98f) return 80;
-  if (v >= 3.88f) return 70;
-  if (v >= 3.80f) return 60;
-  if (v >= 3.74f) return 50;
-  if (v >= 3.68f) return 40;
-  if (v >= 3.62f) return 25;
-  if (v >= 3.55f) return 15;
-  if (v >= 3.45f) return 5;
+  struct Point { float volt; uint8_t pct; };
+  static const Point table[] = {
+    { 4.18f, 100 },
+    { 4.08f,  90 },
+    { 3.98f,  80 },
+    { 3.88f,  70 },
+    { 3.80f,  60 },
+    { 3.74f,  50 },
+    { 3.68f,  40 },
+    { 3.62f,  30 },
+    { 3.56f,  20 },
+    { 3.50f,  10 },
+    { 3.42f,   5 },
+    { 3.30f,   0 }
+  };
+  if (v >= table[0].volt) return 100;
+  if (v <= table[11].volt) return 0;
+  for (int i = 0; i < 11; i++) {
+    if (v >= table[i + 1].volt) {
+      float span = table[i].volt - table[i + 1].volt;
+      float t = (v - table[i + 1].volt) / span;
+      return (uint8_t)(table[i + 1].pct + t * (table[i].pct - table[i + 1].pct));
+    }
+  }
   return 0;
 }
 
 void battery_init() {
-  LOG_BATTERY("初始化电源与传感器采样 (ADC1_CH6, GPIO%d)...", BATTERY_ADC_PIN);
+  LOG_BATTERY("初始化电池电压采样 (ADC1_CH6, GPIO%d, 分压比=%.1f)...", BATTERY_ADC_PIN, BATTERY_DIVIDER_RATIO);
   analogSetPinAttenuation(BATTERY_ADC_PIN, ADC_11db);
   analogReadResolution(12); // 12-bit ADC (0 ~ 4095)
-  battery_update();
-  LOG_BATTERY("电源监测初始化完成: 模式=[%s], ADC=%d, 照度=%d%%",
-              s_isUsbPowered ? "USB 5V稳定供电" : "外部电池模式", s_rawAdc, s_lightPercent);
+  
+  // 初次连续多重采样稳定基准
+  long sumMv = 0;
+  long sumRaw = 0;
+  for (int i = 0; i < 16; i++) {
+    sumMv += analogReadMilliVolts(BATTERY_ADC_PIN);
+    sumRaw += analogRead(BATTERY_ADC_PIN);
+    delay(2);
+  }
+  s_rawAdc = sumRaw / 16;
+  uint32_t avgMv = sumMv / 16;
+  float pinVolt = avgMv / 1000.0f;
+  s_batteryVoltage = pinVolt * BATTERY_DIVIDER_RATIO;
+  s_batteryPercent = calcLipoPercent(s_batteryVoltage);
+  
+  LOG_BATTERY("电池监测初始化完成: ADC=%d, 引脚=%umV, 电池电压=%.2fV, 电量=%d%%",
+              s_rawAdc, avgMv, s_batteryVoltage, s_batteryPercent);
 }
 
 void battery_update() {
-  // 采样间隔 1000ms，避免频繁采样消耗 CPU
+  // 采样间隔 1000ms
   if (millis() - s_lastSampleTime < 1000 && s_lastSampleTime != 0) {
     return;
   }
   s_lastSampleTime = millis();
 
-  // 4 次采样平滑去噪
-  long sum = 0;
-  for (int i = 0; i < 4; i++) {
-    sum += analogRead(BATTERY_ADC_PIN);
-    delayMicroseconds(20);
+  // 8 次采样平滑去噪
+  long sumMv = 0;
+  long sumRaw = 0;
+  for (int i = 0; i < 8; i++) {
+    sumMv += analogReadMilliVolts(BATTERY_ADC_PIN);
+    sumRaw += analogRead(BATTERY_ADC_PIN);
+    delayMicroseconds(50);
   }
-  s_rawAdc = sum / 4;
+  s_rawAdc = sumRaw / 8;
+  uint32_t avgMv = sumMv / 8;
 
-  // IO 34 在 CYD 板载上为光敏电阻 (CDS)
-  // 光照强时电阻变小，分压升高 (0~4095) -> 转换为 0~100% 照度
-  s_lightPercent = (int)constrain((s_rawAdc * 100L) / 4095, 0, 100);
+  // 使用 ESP32 原厂 eFuse 校准转换得到引脚实际毫伏，再乘分压比
+  float pinVolt = avgMv / 1000.0f;
+  float v = pinVolt * BATTERY_DIVIDER_RATIO;
 
-  if (s_isUsbPowered) {
-    s_batteryVoltage = 5.00f;
-    s_batteryPercent = 100;
-  } else {
-    // 若用户外接了锂电池分压采样电路：
-    // 使用 ESP32 原厂 eFuse 校准函数 analogReadMilliVolts
-    uint32_t pinMv = analogReadMilliVolts(BATTERY_ADC_PIN);
-    float v = (pinMv / 1000.0f) * BATTERY_DIVIDER_RATIO;
-    s_batteryVoltage = s_batteryVoltage * 0.7f + v * 0.3f;
-    s_batteryPercent = calcLipoPercent(s_batteryVoltage);
-  }
+  // 采用一阶低通滤波平滑电平波动 (0.85 旧值 + 0.15 新值)
+  s_batteryVoltage = s_batteryVoltage * 0.85f + v * 0.15f;
+  s_batteryPercent = calcLipoPercent(s_batteryVoltage);
 }
 
 float battery_get_voltage() {
@@ -76,20 +96,11 @@ int battery_get_raw_adc() {
   return s_rawAdc;
 }
 
-int battery_get_light_percent() {
-  return s_lightPercent;
-}
-
 bool battery_is_low() {
-  if (s_isUsbPowered) return false;
-  return s_batteryVoltage < (BATTERY_VOLT_MIN + 0.15f);
+  return s_batteryVoltage < (BATTERY_VOLT_MIN + 0.15f); // 低于 3.45V 告警
 }
 
 bool battery_is_usb_powered() {
-  return s_isUsbPowered;
-}
-
-void battery_set_usb_mode(bool isUsb) {
-  s_isUsbPowered = isUsb;
-  battery_update();
+  // 处于 USB 供电或充电状态时，单节锂电池端电压通常达到 4.15V 以上
+  return s_batteryVoltage >= 4.15f;
 }

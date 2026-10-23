@@ -43,14 +43,10 @@ static void renderClockDashboard() {
     font_draw_string(8, 4, "WiFi: 未连接 (可点下方配网)", COLOR_TEXT_MUTED, 0x10A2, 1);
   }
 
-  // 电源与电池状态指示 (右侧)
-  char bBuf[16];
-  if (battery_is_usb_powered()) {
-    strcpy(bBuf, "USB 5V");
-  } else {
-    snprintf(bBuf, sizeof(bBuf), "%.2fV", battery_get_voltage());
-  }
-  font_draw_string(216, 4, bBuf, COLOR_ACCENT_CYAN, 0x10A2, 1);
+  // 电池电量与电压状态指示 (右侧: 194..274)
+  char bBuf[24];
+  snprintf(bBuf, sizeof(bBuf), "%d%% %.2fV", battery_get_percent(), battery_get_voltage());
+  font_draw_string(194, 4, bBuf, COLOR_ACCENT_CYAN, 0x10A2, 1);
 
   // 电池外框与填充条 (右侧: bx=276, by=5, bw=30, bh=14)
   int bx = 276, by = 5, bw = 30, bh = 14;
