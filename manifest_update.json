@@ -1,0 +1,13 @@
+{
+  "name": "Bailan MP3 Player v1.1.4 (应用固件平滑升级 - 保留NVS与校准)",
+  "version": "1.1.4",
+  "home_page": "https://github.com/Bailan766/ESP32-2432S028R-Plus",
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "firmware.bin", "offset": 65536 }
+      ]
+    }
+  ]
+}

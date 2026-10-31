@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYD Plus 摆烂播放器 - 网页一键刷机工具</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%3E<text y=%2226%22 font-size=%2226%22>📻</text></svg>">
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --green-bg: rgba(46, 160, 67, 0.15);
+      --red: #f85149;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      padding: 30px 20px;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 720px;
+    }
+    header {
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f0f6fc;
+      letter-spacing: -0.5px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 20px;
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid rgba(63, 185, 80, 0.3);
+    }
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .step-num {
+      width: 22px;
+      height: 22px;
+      background: #21262d;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: bold;
+    }
+    .mode-options {
+      display: grid;
+      gap: 12px;
+    }
+    .mode-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      background: #0d1117;
+      transition: all 0.15s ease;
+    }
+    .mode-label:hover {
+      border-color: #58a6ff;
+      background: rgba(88, 166, 255, 0.04);
+    }
+    .mode-label input[type="radio"] {
+      margin-top: 4px;
+      accent-color: #58a6ff;
+    }
+    .mode-text h3 {
+      font-size: 14px;
+      color: #f0f6fc;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .mode-text p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .install-box {
+      text-align: center;
+      padding: 24px;
+      background: #0d1117;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      margin-top: 14px;
+    }
+    esp-web-install-button {
+      --esp-tools-button-color: #238636;
+      --esp-tools-button-text-color: #fff;
+      --esp-tools-button-border-radius: 6px;
+    }
+    .install-tip {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 12px;
+    }
+    .notice {
+      display: flex;
+      gap: 10px;
+      padding: 12px;
+      background: rgba(88, 166, 255, 0.08);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 6px;
+      font-size: 13px;
+      color: #c9d1d9;
+      margin-bottom: 16px;
+    }
+    .notice-icon { font-size: 16px; flex-shrink: 0; }
+    .faq-item {
+      margin-bottom: 12px;
+    }
+    .faq-q {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 4px;
+    }
+    .faq-a {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 30px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    #unsupported-alert {
+      display: none;
+      padding: 14px;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid rgba(248, 81, 73, 0.4);
+      color: #ff7b72;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-row">
+        <h1>CYD Plus 摆烂播放器 网页刷机工具</h1>
+        <span class="badge">v1.1.4</span>
+      </div>
+      <p class="subtitle">适用于 ESP32-2432S028R Plus 一体化触屏板。基于 Web Serial 协议，打开网页直接烧录。</p>
+    </header>
+
+    <div id="unsupported-alert">
+      ⚠️ 你的浏览器不支持 Web Serial 串口通讯。请使用 <strong>Google Chrome</strong>、<strong>Microsoft Edge</strong> 或 <strong>Opera</strong> 桌面版打开此页面。
+    </div>
+
+    <div class="notice">
+      <div class="notice-icon">🔌</div>
+      <div>
+        <strong>准备工作</strong>：请用 <strong>Type-C 数据线</strong> 将板子连接至电脑 USB 口。<br>
+        （若之前只能充电无串口，说明是纯充电线，需换成能传输数据的数据线）。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="step-num">1</span>
+        <span>选择刷机模式</span>
+      </div>
+      <div class="mode-options">
+        <label class="mode-label">
+          <input type="radio" name="firmware-mode" value="full" checked onchange="switchManifest('manifest.json')">
+          <div class="mode-text">
+            <h3>🚀 全量全新刷入 (强烈推荐)</h3>
+            <p>写入 Bootloader 引导、分区表及 v1.1.4 完整系统。适合首次烧录、或解决死机、触摸失灵等疑难杂症。</p>
+          </div>
+        </label>
+        <label class="mode-label">
+          <input type="radio" name="firmware-mode" value="update" onchange="switchManifest('manifest_update.json')">
+          <div class="mode-text">
+            <h3>⚡ 平滑升级固件 (保留配置)</h3>
+            <p>仅烧录 0x10000 应用程序区。自动保留您的 NVS 设置、Wi-Fi 密码、触控校准参数与播放历史记录。</p>
+          </div>
+        </label>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <div class="card-title" style="margin-bottom: 8px;">
+          <span class="step-num">2</span>
+          <span>连接并开始刷入</span>
+        </div>
+        <div class="install-box">
+          <esp-web-install-button id="installer" manifest="manifest.json">
+            <button slot="activate" style="cursor:pointer; background-color:#238636; color:#ffffff; padding:12px 28px; border:none; border-radius:6px; font-size:15px; font-weight:600; display:inline-flex; align-items:center; gap:8px;">
+              <span>⚡ 开始连接并刷入</span>
+            </button>
+            <span slot="unsupported">当前浏览器不支持 Web Serial，请换用 Chrome 或 Edge</span>
+            <span slot="not-allowed">出于安全限制，网页刷机必须在 HTTPS 域名或 http://localhost 下运行</span>
+          </esp-web-install-button>
+          <p class="install-tip">点击按钮后，在浏览器弹窗中选中带有 <strong>CH340</strong> 或 <strong>USB-Serial</strong> 的端口即可自动开始。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>💡 常见排查指引 (FAQ)</span>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Q1: 点击后弹窗里找不到板子的串口？</div>
+        <div class="faq-a">1) 确保连接线是「数据线」，许多手机附赠的线是纯充电线，无 D+/D- 信号线。<br>2) 电脑需安装 CH340 虚拟串口驱动（通常 Windows 10/11 联网会自动装好）。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Q2: 烧录过程中提示 "Connecting..." 超时失败？</div>
+        <div class="faq-a">部分批次板子串口复位电路电容容值偏大，可尝试：按住开发板背面的 <strong>BOOT 按键不松开</strong>，点击连接，看到开始 Erasing/Writing 后再松开手指。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Q3: 刷完之后怎么用？</div>
+        <div class="faq-a">烧录进度到达 100% 后，ESP32 会自动软复位进入系统。首次开机将在 2.5 秒内自动展示启动画面并进入主屏。插上 TF 卡（格式化为 FAT32）并拷入 MP3 即可开听。</div>
+      </div>
+    </div>
+
+    <footer>
+      <p>开源项目：<a href="https://github.com/Bailan766/ESP32-2432S028R-Plus" target="_blank">Bailan766 / ESP32-2432S028R-Plus</a> · 硬件平台: CYD Plus</p>
+    </footer>
+  </div>
+
+  <script>
+    if (!('serial' in navigator)) {
+      document.getElementById('unsupported-alert').style.display = 'block';
+    }
+
+    function switchManifest(manifestPath) {
+      const installer = document.getElementById('installer');
+      installer.setAttribute('manifest', manifestPath);
+    }
+  </script>
+</body>
+</html>
