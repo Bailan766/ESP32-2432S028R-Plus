@@ -5,3 +5,6 @@
 .vscode/ipch
 *.bak
 *.tmp
+
+# WorkBuddy AI 项目记忆目录（本地工作数据，不入库）
+.workbuddy-ai/

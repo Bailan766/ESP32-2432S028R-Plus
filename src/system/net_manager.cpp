@@ -13,6 +13,18 @@ static unsigned long s_lastWifiCheck = 0;
 static bool s_wasConnected = false;
 static Preferences s_prefs;
 
+// ---------------- 省电：Wi-Fi 射频按需开关 ----------------
+// 联网完成 NTP + 天气同步后关闭射频，之后每 30 分钟短暂唤醒一次刷新天气。
+// 实测 Wi-Fi 常开时待机电流约 100~120mA，关射频后可降到 20mA 量级。
+#define NET_RADIO_KEEPALIVE_MS   25000UL              // 联网后保持射频的时间
+#define NET_WEATHER_REFRESH_MS   (30UL * 60UL * 1000UL) // 天气刷新周期：30 分钟
+
+static bool s_powerSave = true;
+static bool s_radioOn = true;
+static unsigned long s_radioOffAt = 0;   // 到点关闭射频
+static unsigned long s_lastRefresh = 0;  // 上次联网刷新时间
+static uint8_t s_connectRetry = 0;       // 未联网时的射频续期次数
+
 void net_sync_time() {
   LOG_UI("正在通过 NTP 服务同步北京时间...");
   configTime(8 * 3600, 0, "ntp1.aliyun.com", "pool.ntp.org", "time.asia.apple.com");
@@ -74,6 +86,7 @@ static void checkSdCardWifiFile() {
 
 void net_init() {
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(true);   // 开启 modem sleep，空闲时进一步省电
   s_prefs.begin("wifi_cfg", true);
   String savedSsid = s_prefs.getString("ssid", "");
   String savedPass = s_prefs.getString("pass", "");
@@ -87,7 +100,58 @@ void net_init() {
     Serial.println("[WIFI] 后台静默重连启动中...");
   }
 
+  s_radioOn = true;
+  s_radioOffAt = millis() + NET_RADIO_KEEPALIVE_MS;
+  s_lastRefresh = millis();
+
   checkSdCardWifiFile();
+}
+
+// ---------------- 省电：射频开关 ----------------
+
+void net_set_power_save(bool enable) {
+  s_powerSave = enable;
+  LOG_SYS("Wi-Fi 省电模式: %s", enable ? "开启" : "关闭");
+  if (!enable) {
+    // 关闭省电时确保射频处于工作状态
+    net_wake_radio(NET_RADIO_KEEPALIVE_MS);
+  }
+}
+
+bool net_get_power_save() {
+  return s_powerSave;
+}
+
+bool net_radio_is_on() {
+  return s_radioOn;
+}
+
+void net_wake_radio(uint32_t keepMs) {
+  if (s_radioOn) {
+    s_radioOffAt = millis() + keepMs;
+    return;
+  }
+
+  LOG_SYS("开启 Wi-Fi 射频 (保持 %lu ms)", (unsigned long)keepMs);
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(true);
+
+  s_prefs.begin("wifi_cfg", true);
+  String ssid = s_prefs.getString("ssid", "");
+  String pass = s_prefs.getString("pass", "");
+  s_prefs.end();
+
+  if (ssid.length() > 0) {
+    WiFi.begin(ssid.c_str(), pass.c_str());
+  } else {
+    WiFi.begin();
+  }
+
+  s_radioOn = true;
+  s_wasConnected = false;
+  s_connectRetry = 0;
+  s_radioOffAt = millis() + keepMs;
+  s_lastWifiCheck = 0;
 }
 
 static void handleSerialCommands() {
@@ -113,7 +177,12 @@ static void handleSerialCommands() {
       Serial.println("==================================================");
     } else if (cmd.equalsIgnoreCase("WEATHER")) {
       Serial.println("[WIFI] 强制手动刷新天气...");
+      net_wake_radio(NET_RADIO_KEEPALIVE_MS);
       weather_fetch();
+    } else if (cmd.equalsIgnoreCase("SAVE") || cmd.equalsIgnoreCase("WIFI:SAVE")) {
+      net_set_power_save(true);
+    } else if (cmd.equalsIgnoreCase("ALWAYS") || cmd.equalsIgnoreCase("WIFI:ALWAYS")) {
+      net_set_power_save(false);
     } else if (cmd.startsWith("WIFI:") || cmd.startsWith("wifi:")) {
       String params = cmd.substring(5);
       params.trim();
@@ -134,24 +203,55 @@ static void handleSerialCommands() {
 void net_update() {
   handleSerialCommands();
 
-  // 周期性检查连接状态
-  if (millis() - s_lastWifiCheck >= 2000) {
-    s_lastWifiCheck = millis();
-    bool connected = (WiFi.status() == WL_CONNECTED);
+  const unsigned long now = millis();
 
-    if (connected && !s_wasConnected) {
-      s_wasConnected = true;
-      Serial.printf("[WIFI] Wi-Fi 连接成功! IP 地址: %s (SSID: %s)\n",
-                    WiFi.localIP().toString().c_str(), WiFi.SSID().c_str());
-      net_sync_time();
-      weather_fetch();
-    } else if (!connected && s_wasConnected) {
-      s_wasConnected = false;
-      Serial.println("[WIFI] Wi-Fi 连接断开");
+  if (s_radioOn) {
+    // 周期性检查连接状态
+    if (now - s_lastWifiCheck >= 2000) {
+      s_lastWifiCheck = now;
+      bool connected = (WiFi.status() == WL_CONNECTED);
+
+      if (connected && !s_wasConnected) {
+        s_wasConnected = true;
+        Serial.printf("[WIFI] Wi-Fi 连接成功! IP 地址: %s (SSID: %s)\n",
+                      WiFi.localIP().toString().c_str(), WiFi.SSID().c_str());
+        net_sync_time();
+        weather_fetch();
+        s_lastRefresh = now;
+        s_radioOffAt = now + NET_RADIO_KEEPALIVE_MS;
+        s_connectRetry = 0;
+      } else if (!connected && s_wasConnected) {
+        s_wasConnected = false;
+        Serial.println("[WIFI] Wi-Fi 连接断开");
+      }
+
+      if (connected) {
+        weather_update();
+      }
     }
 
-    if (connected) {
-      weather_update();
+    // 到点关射频：若一直没连上，先续期两次（共约 75 秒）再放弃，避免白白错过同步
+    if (s_powerSave && s_radioOffAt != 0 && (long)(now - s_radioOffAt) >= 0) {
+      if (!s_wasConnected && s_connectRetry < 2) {
+        s_connectRetry++;
+        LOG_SYS("省电: 尚未联网，射频续期 %d/2 (再等 25 秒)", s_connectRetry);
+        s_radioOffAt = now + NET_RADIO_KEEPALIVE_MS;
+      } else {
+        LOG_SYS("省电: 关闭 Wi-Fi 射频 (待机电流下降)");
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        s_radioOn = false;
+        s_wasConnected = false;
+        s_radioOffAt = 0;
+        s_connectRetry = 0;
+      }
+    }
+  } else {
+    // 射频关闭中：按周期短暂唤醒刷新天气与时间
+    if (s_powerSave && (now - s_lastRefresh >= NET_WEATHER_REFRESH_MS)) {
+      LOG_SYS("省电: 周期性唤醒 Wi-Fi 刷新天气");
+      s_lastRefresh = now;
+      net_wake_radio(NET_RADIO_KEEPALIVE_MS);
     }
   }
 }
@@ -198,4 +298,9 @@ void net_start_config_portal() {
     weather_fetch();
     delay(1200);
   }
+
+  // 配网结束后重新开始省电计时
+  s_radioOn = true;
+  s_radioOffAt = millis() + NET_RADIO_KEEPALIVE_MS;
+  s_lastRefresh = millis();
 }

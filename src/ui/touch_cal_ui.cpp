@@ -27,6 +27,24 @@ static unsigned long s_enterTime = 0;
 static int16_t s_prevCanvasX = -1;
 static int16_t s_prevCanvasY = -1;
 
+// 校准页必须看得见：进入时临时拉满背光，退出时恢复原亮度。
+// 否则用户把亮度调到很低后进校准页，几乎看不到红色十字，只能盲点。
+static uint8_t s_prevBrightness = 80;
+static bool s_brightnessBoosted = false;
+
+static void boostBrightness() {
+  if (s_brightnessBoosted) return;
+  s_prevBrightness = display_get_brightness();
+  display_set_brightness(100);
+  s_brightnessBoosted = true;
+}
+
+static void restoreBrightness() {
+  if (!s_brightnessBoosted) return;
+  display_set_brightness(s_prevBrightness);
+  s_brightnessBoosted = false;
+}
+
 static void drawCrosshair(int x, int y, uint16_t color) {
   TFT_eSPI& tft = display_get_tft();
   tft.drawCircle(x, y, 14, color);
@@ -38,6 +56,7 @@ static void drawCrosshair(int x, int y, uint16_t color) {
 }
 
 static void exitCalibration() {
+  restoreBrightness();
   if (ui_get_previous_page() == UI_PAGE_SETTINGS) {
     ui_switch_to(UI_PAGE_SETTINGS);
   } else {
@@ -98,6 +117,7 @@ void touch_cal_ui_enter() {
   s_prevCanvasX = -1;
   s_prevCanvasY = -1;
 
+  boostBrightness();   // 校准期间临时拉满背光，确保十字可见
   renderTargetPoint(0);
 }
 

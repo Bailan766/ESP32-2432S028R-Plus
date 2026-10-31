@@ -1,5 +1,5 @@
 // ==============================================================================
-// Bailan MP3 Player - 主入口程序 (v0.1.0)
+// Bailan MP3 Player - 主入口程序 (版本号统一由 include/config.h 的 PROJECT_VERSION 提供)
 // 适配硬件: ESP32-2432S028R Plus 一体化开发板 (CYD Plus)
 // 架构: 模块化分层驱动 (Hardware -> Storage -> Player -> System -> UI)
 // ==============================================================================
@@ -50,32 +50,44 @@ void setup() {
   // 2. 初始化持久化配置系统 (NVS / Preferences)
   settings_init();
 
-  // 3. 初始化板载 RGB 状态指示灯
+  // 3. 优先初始化 TF 卡
+  //    实测：若放在 LCD 背光/音频之后初始化，大容量卡在软复位后经常挂不上；
+  //    提到最前面可让卡片在电源最"干净"的时刻完成上电时序。
+  sdcard_init();
+  scanner_init();
+
+  // 4. 初始化板载 RGB 状态指示灯
   rgb_init();
   rgb_set_state(RGB_BOOT); // 开机点亮青蓝提示
 
-  // 4. 初始化实体按键 (BOOT GPIO 0)
+  // 5. 初始化实体按键 (BOOT GPIO 0)
   button_init();
 
-  // 5. 初始化功放与音频 PWM (GPIO 4 / GPIO 26)
+  // 6. 初始化功放与音频 PWM (GPIO 4 / GPIO 26)
   audio_init();
   audio_set_volume(settings_get().volume);
 
-  // 6. 初始化电池 ADC (GPIO 34)
+  // 7. 初始化电池 ADC (GPIO 34)
   battery_init();
 
-  // 7. 初始化 LCD 显示与背光 (ST7789, GPIO 14/13/15/2/21)
+  // 8. 初始化 LCD 显示与背光 (ST7789, GPIO 14/13/15/2/21)
   display_init();
   display_set_rotation(settings_get().screenRotation);
-  display_set_brightness(settings_get().brightness);
 
-  // 8. 初始化电阻式触摸屏 (XPT2046 软件 SPI)
+  // 亮度安全兜底：存储值过低（≤15%）时屏幕几乎不可见，容易被误判为"黑屏"，
+  // 自动修正到可读水平并写回，避免用户被锁在"看不见"的状态里。
+  uint8_t bootBrightness = settings_get().brightness;
+  if (bootBrightness < 15) {
+    LOG_SYS("存储亮度 %d%% 过低，已自动修正为 50%%", bootBrightness);
+    settings_get().brightness = 50;
+    settings_save();
+    bootBrightness = 50;
+  }
+  display_set_brightness(bootBrightness);
+
+  // 9. 初始化电阻式触摸屏 (XPT2046 软件 SPI)
   touch_init();
   touch_set_rotation(settings_get().screenRotation);
-
-  // 9. 初始化存储与 TF 卡扫描 (HSPI: GPIO 18/19/23/5)
-  sdcard_init();
-  scanner_init();
 
   // 10. 初始化播放引擎与最近播放
   player_init();
@@ -143,6 +155,13 @@ void loop() {
       s_firstX = -1;
       s_firstY = -1;
     }
+  } else {
+    // 校准页：触摸采样由 touch_cal_ui_update() 独占处理，这里只负责保持屏幕常亮。
+    // 否则息屏后触摸唤醒逻辑被跳过，屏幕会永久黑屏。
+    power_reset_inactivity_timer();
+    if (power_is_screen_sleeping()) {
+      power_wake_screen();
+    }
   }
 
   // 2. 实体按键轮询检测 (BOOT 短按/长按)
@@ -177,9 +196,32 @@ void loop() {
   // 9. 竞赛级诊断信息上报 (串口统计输出)
   diagnostics_update();
 
-  // 10. 网络与天气服务状态机更新
+  // 11. 网络与天气服务状态机更新
   net_update();
 
-  // 11. 释放极微弱时间片保证看门狗与后台任务运行
-  delay(4);
+  // 12. TF 卡后台重试挂载
+  //     大容量卡在软复位后会"卡死"，只有物理重新插拔才能恢复。
+  //     因此这里不设总次数上限：前 4 次每 30 秒快试，之后降为每 2 分钟一次并长期保持，
+  //     用户随时重新插拔卡片都能在 2 分钟内被自动认到，无需手动点「重扫」。
+  {
+    static unsigned long s_lastSdRetry = 0;
+    static uint16_t s_sdRetryCount = 0;
+    if (!sdcard_is_available()) {
+      const uint32_t interval = (s_sdRetryCount < 4) ? 30000UL : 120000UL;
+      if (millis() - s_lastSdRetry >= interval) {
+        s_lastSdRetry = millis();
+        s_sdRetryCount++;
+        LOG_SD("后台重试挂载 TF 卡 (第 %u 次)...", s_sdRetryCount);
+        if (sdcard_reinit()) {
+          scanner_scan_all();   // 挂上后立刻重扫曲库
+        }
+      }
+    } else {
+      s_sdRetryCount = 0;       // 已挂载则重置计数，掉卡后重新从快试开始
+    }
+  }
+
+  // 13. 释放极微弱时间片保证看门狗与后台任务运行
+  //     息屏时降低轮询频率，减少 CPU 唤醒次数（配合 power_manager 的降频）
+  delay(power_is_screen_sleeping() ? 20 : 4);
 }

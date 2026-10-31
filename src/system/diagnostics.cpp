@@ -4,6 +4,7 @@
 #include "hardware/display.h"
 #include "storage/sdcard.h"
 #include "player/player.h"
+#include "system/net_manager.h"
 
 static unsigned long s_lastDiagTime = 0;
 
@@ -37,12 +38,14 @@ void diagnostics_dump_now() {
 void diagnostics_update() {
   if (millis() - s_lastDiagTime >= 10000) { // 每 10 秒输出一次诊断简报
     s_lastDiagTime = millis();
-    LOG_SYS("Uptime: %lus | Heap: %uB (Min:%uB) | Batt: %.2fV | TF: %s | Player: %s",
+    LOG_SYS("Uptime: %lus | Heap: %uB (Min:%uB) | Batt: %.2fV | TF: %s | Player: %s | CPU: %dMHz | WiFi: %s",
             diagnostics_get_uptime_sec(),
             diagnostics_get_free_heap(),
             diagnostics_get_min_free_heap(),
             battery_get_voltage(),
             sdcard_get_state_str(),
-            player_state_to_string(player_get_state()));
+            player_state_to_string(player_get_state()),
+            ESP.getCpuFreqMHz(),
+            net_radio_is_on() ? "ON" : "OFF(省电)");
   }
 }

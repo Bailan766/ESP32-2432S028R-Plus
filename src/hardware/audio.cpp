@@ -5,47 +5,93 @@
 #include <AudioFileSourcePROGMEM.h>
 #include <AudioGeneratorMP3.h>
 #include <AudioGeneratorWAV.h>
-#include <AudioOutputI2S.h>
-#include <driver/i2s.h>
+#include <AudioOutput.h>
 #include <driver/dac.h>
 #include "../demo_music.h"
 
-// 专为 ESP32-2432S028R-Plus (CYD Plus) 硬件定制的音频输出驱动
-// CYD 的板载扬声器/功放连接在 GPIO 26 (内部 DAC2 / 左声道)
-// 而 GPIO 25 则是电阻触摸屏 XPT2046 独立软件 SPI 的关键时钟引脚 TOUCH_SCK_PIN！
-// 标准 ESP8266Audio::AudioOutputI2S(0, INTERNAL_DAC) 默认调用 i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN)，
-// 会强行霸占 GPIO 25 和 GPIO 26 作为模拟输出引脚，导致 GPIO 25 无法再输出数字 SPI 时钟脉冲，
-// 从而导致播放音乐/BGM 时触控完全失灵、死机且无法退出！
-// AudioOutputCYD 继承并覆写 begin/stop，强制限定 DAC 仅使用左声道(DAC2, GPIO 26)，彻底释放 GPIO 25！
-class AudioOutputCYD : public AudioOutputI2S {
+// ==============================================================================
+// 音频输出驱动：直接按采样率写 DAC / PWM，不使用 I2S
+//
+// 为什么不用 ESP8266Audio 自带的 AudioOutputI2S(INTERNAL_DAC)：
+//   1) 该实现把 DAC 模式的 sample_rate 硬编码为 44100，与 8kHz 演示 WAV 不匹配，
+//      实测表现为"既不出声也不推进"；
+//   2) 其 i2s_set_dac_mode(BOTH_EN) 会同时占用 GPIO25/GPIO26，
+//      而 GPIO25 正是 XPT2046 触摸屏软件 SPI 的时钟线，会导致播放时触控失灵。
+//
+// 输出通道由 config.h 的 AUDIO_OUTPUT_USE_PWM 选择：
+//   0 -> 内部 DAC2 (GPIO26)，用于板载功放
+//   1 -> LEDC PWM (GPIO27)，用于外接 PAM8302 等模拟功放模块
+// ==============================================================================
+
+static void audioOutInit() {
+#if AUDIO_OUTPUT_USE_PWM
+  ledcSetup(AUDIO_PWM_CHANNEL, AUDIO_PWM_CARRIER, AUDIO_PWM_RES);
+  ledcAttachPin(AUDIO_PWM_PIN, AUDIO_PWM_CHANNEL);
+  ledcWrite(AUDIO_PWM_CHANNEL, 128);   // 50% 占空比 = 中点偏置
+  // 外接功放模式下，板载功放输入(GPIO26)仍悬空会持续自激嗡叫；
+  // 顺带把 DAC2 也钳在中点，让板载功放保持安静。
+  dac_output_enable(DAC_CHANNEL_2);
+  dacWrite(AUDIO_DAC_PIN, 128);
+#else
+  dac_output_enable(DAC_CHANNEL_2);
+  dacWrite(AUDIO_DAC_PIN, 128);
+#endif
+}
+
+static inline void audioWriteSample(uint8_t v) {
+#if AUDIO_OUTPUT_USE_PWM
+  ledcWrite(AUDIO_PWM_CHANNEL, v);
+#else
+  dacWrite(AUDIO_DAC_PIN, v);
+#endif
+}
+
+class AudioOutputDirect : public AudioOutput {
 public:
-  AudioOutputCYD(int port = 0) : AudioOutputI2S(port, INTERNAL_DAC) {
-    SetOutputModeMono(true); // 左右声道自动混音至单声道，确保通过 DAC2(GPIO 26) 听到完整左右声道声音
+  AudioOutputDirect() {
+    hertz = 8000;
+    bps = 16;
+    channels = 1;
+    gainF2P6 = 64;
   }
 
-  virtual bool begin() override {
-    bool res = AudioOutputI2S::begin(true);
-    if (res) {
-      // 关键修复：强制将 DAC 模式设置为仅左声道 (DAC2, GPIO 26)，并关闭 DAC1 (GPIO 25)
-      i2s_set_dac_mode(I2S_DAC_CHANNEL_LEFT_EN);
-      restoreTouchPin();
-      LOG_AUDIO("AudioOutputCYD: 已成功锁定仅启用 DAC2(GPIO 26)，彻底释放 GPIO 25(TOUCH_SCK) 给触控！");
+  bool begin() override {
+    audioOutInit();
+    s_nextUs = micros();
+    s_budget = 0;
+    return true;
+  }
+
+  bool ConsumeSample(int16_t sample[2]) override {
+    // 每处理一小批就让出一次 CPU，避免生成器的 loop() 长时间不返回、
+    // 导致主循环（触摸/按键/UI）被完全饿死。
+    if (s_budget >= kBudget) {
+      s_budget = 0;
+      return false;
     }
-    return res;
+    s_budget++;
+
+    MakeSampleStereo16(sample);          // 单声道/8bit 统一转成 16bit 有符号
+    int16_t v = Amplify(sample[LEFTCHANNEL]);
+
+    // 按采样率节流到下一个采样点
+    const uint32_t periodUs = 1000000UL / hertz;
+    while ((int32_t)(micros() - s_nextUs) < 0) { /* busy wait */ }
+    s_nextUs += periodUs;
+
+    audioWriteSample((uint8_t)((v >> 8) + 128));  // 16bit -> 8bit 无符号
+    return true;
   }
 
-  virtual bool stop() override {
-    bool res = AudioOutputI2S::stop();
-    restoreTouchPin();
-    dac_output_disable(DAC_CHANNEL_2);
-    return res;
+  bool stop() override {
+    audioWriteSample(128);
+    return true;
   }
 
-  static void restoreTouchPin() {
-    dac_output_disable(DAC_CHANNEL_1);
-    pinMode(TOUCH_SCK_PIN, OUTPUT);
-    digitalWrite(TOUCH_SCK_PIN, LOW);
-  }
+private:
+  static const uint8_t kBudget = 48;
+  uint32_t s_nextUs = 0;
+  uint8_t s_budget = 0;
 };
 
 static uint8_t s_volume = 70; // 默认 70%
@@ -54,32 +100,50 @@ static AudioFileSourceSD *s_file = nullptr;
 static AudioFileSourcePROGMEM *s_fileProgmem = nullptr;
 static AudioGeneratorMP3 *s_mp3 = nullptr;
 static AudioGeneratorWAV *s_wav = nullptr;
-static AudioOutputCYD *s_out = nullptr;
+static AudioOutputDirect *s_out = nullptr;
 
 static bool s_isPlayingAudio = false;
 static bool s_isWav = false;
 
+// 待机中点偏置：功放为常开状态，若音频脚处于高阻/悬空，功放输入拾噪会自激，
+// 表现为贴近喇叭可听到的低频嗡声。把输出稳定在中点可钳住输入电平。
+static void audio_hold_idle_bias() {
+  if (s_isPlayingAudio) return;
+  audioWriteSample(128);
+#if AUDIO_OUTPUT_USE_PWM
+  // 板载功放常开且输入悬空，持续钳住 GPIO26 让它保持安静
+  dac_output_enable(DAC_CHANNEL_2);
+  dacWrite(AUDIO_DAC_PIN, 128);
+#endif
+}
+
 void audio_init() {
-  LOG_AUDIO("初始化音频子系统 (内部 DAC2/GPIO26 单声道, 释放 GPIO25 触摸时钟)...");
-  
+#if AUDIO_OUTPUT_USE_PWM
+  LOG_AUDIO("初始化音频子系统 (LEDC PWM -> GPIO%d, %d kHz 载波, 外接功放模式)...",
+            AUDIO_PWM_PIN, AUDIO_PWM_CARRIER / 1000);
+#else
+  LOG_AUDIO("初始化音频子系统 (内部 DAC2 -> GPIO%d / CN1 音频接口, 外接功放模式)...", AUDIO_DAC_PIN);
+#endif
+
   amp_init();
-  AudioOutputCYD::restoreTouchPin();
-  
-  s_out = new AudioOutputCYD(0);
+
+  s_out = new AudioOutputDirect();
   s_mp3 = new AudioGeneratorMP3();
   s_wav = new AudioGeneratorWAV();
   s_file = new AudioFileSourceSD();
   s_fileProgmem = new AudioFileSourcePROGMEM(demo_wav, demo_wav_len);
-  
+
+  audioOutInit();
   audio_set_volume(s_volume);
+  audio_hold_idle_bias();
+  LOG_AUDIO("音频输出已钳位于中点偏置，待机静音");
 }
 
 void audio_set_volume(uint8_t volume_percent) {
   s_volume = constrain(volume_percent, 0, 100);
   LOG_AUDIO("音量全局设置: %d%%", s_volume);
   if (s_out) {
-    float gain = s_volume / 100.0f;
-    s_out->SetGain(gain);
+    s_out->SetGain(s_volume / 100.0f);
   }
 }
 
@@ -93,17 +157,16 @@ bool audio_play_mp3(const char* filepath) {
     LOG_AUDIO("无法打开MP3文件: %s", filepath);
     return false;
   }
-  
+
   amp_enable();
   if (!s_mp3->begin(s_file, s_out)) {
     LOG_AUDIO("MP3解码器启动失败: %s", filepath);
     s_file->close();
     amp_disable();
     s_isPlayingAudio = false;
-    AudioOutputCYD::restoreTouchPin();
+    audio_hold_idle_bias();
     return false;
   }
-  AudioOutputCYD::restoreTouchPin();
   s_isPlayingAudio = true;
   s_isWav = false;
   LOG_AUDIO("开始播放MP3: %s", filepath);
@@ -114,20 +177,20 @@ bool audio_play_demo_wav() {
   audio_stop();
   s_fileProgmem->close();
   s_fileProgmem->open(demo_wav, demo_wav_len);
-  
+
   amp_enable();
   if (!s_wav->begin(s_fileProgmem, s_out)) {
     LOG_AUDIO("Demo WAV解码器启动失败");
     s_fileProgmem->close();
     amp_disable();
     s_isPlayingAudio = false;
-    AudioOutputCYD::restoreTouchPin();
+    audio_hold_idle_bias();
     return false;
   }
-  AudioOutputCYD::restoreTouchPin();
   s_isPlayingAudio = true;
   s_isWav = true;
-  LOG_AUDIO("开始播放内部闪存 Demo WAV");
+  LOG_AUDIO("开始播放内部闪存 Demo WAV (size=%u, pos=%u)",
+            s_fileProgmem->getSize(), s_fileProgmem->getPos());
   return true;
 }
 
@@ -135,16 +198,15 @@ void audio_pause() {
   if (s_isPlayingAudio) {
     s_out->stop();
     amp_disable();
-    AudioOutputCYD::restoreTouchPin();
   }
   s_isPlayingAudio = false;
+  audio_hold_idle_bias();
 }
 
 void audio_resume() {
   if (!s_isPlayingAudio) {
     amp_enable();
     s_out->begin();
-    AudioOutputCYD::restoreTouchPin();
     s_isPlayingAudio = true;
   }
 }
@@ -154,38 +216,60 @@ void audio_stop() {
   if (s_wav && s_wav->isRunning()) s_wav->stop();
   if (s_file && s_file->isOpen()) s_file->close();
   if (s_fileProgmem && s_fileProgmem->isOpen()) s_fileProgmem->close();
-  
+
   amp_disable();
-  AudioOutputCYD::restoreTouchPin();
   s_isPlayingAudio = false;
+  audio_hold_idle_bias();
 }
 
+// 硬件自检蜂鸣：走与播放相同的输出通道。
+//   1) 播放中直接返回，避免抢占音频输出；
+//   2) 短于 60ms 的 UI 点击反馈音直接跳过——反复开关功放反而会引入 POP 爆音。
 void audio_test_beep(uint16_t freq, uint16_t duration_ms) {
-  // Ignored in media mode
+  if (s_isPlayingAudio) return;
+  if (duration_ms < 60) return;
+  if (freq < 100 || freq > 8000) return;
+
+  amp_enable();
+  audioOutInit();
+  delay(10);
+
+  const uint32_t halfPeriodUs = 500000UL / freq;
+  const unsigned long start = millis();
+  while (millis() - start < duration_ms) {
+    audioWriteSample(210);
+    delayMicroseconds(halfPeriodUs);
+    audioWriteSample(45);
+    delayMicroseconds(halfPeriodUs);
+  }
+
+  amp_disable();
+  audio_hold_idle_bias();
 }
 
 void audio_update() {
-  if (s_isPlayingAudio) {
-    if (s_isWav) {
-      if (s_wav && s_wav->isRunning()) {
-        if (!s_wav->loop()) {
-          s_wav->stop();
-          amp_disable();
-          AudioOutputCYD::restoreTouchPin();
-          s_isPlayingAudio = false;
-          LOG_AUDIO("WAV 播放结束");
-        }
+  if (!s_isPlayingAudio) return;
+
+  if (s_isWav) {
+    if (s_wav && s_wav->isRunning()) {
+      if (!s_wav->loop()) {
+        LOG_AUDIO("WAV 播放结束 (pos=%u / size=%u)",
+                  s_fileProgmem->getPos(), s_fileProgmem->getSize());
+        s_wav->stop();
+        amp_disable();
+        s_isPlayingAudio = false;
+        audio_hold_idle_bias();
       }
-    } else {
-      if (s_mp3 && s_mp3->isRunning()) {
-        if (!s_mp3->loop()) {
-          s_mp3->stop();
-          s_file->close();
-          amp_disable();
-          AudioOutputCYD::restoreTouchPin();
-          s_isPlayingAudio = false;
-          LOG_AUDIO("MP3 播放结束");
-        }
+    }
+  } else {
+    if (s_mp3 && s_mp3->isRunning()) {
+      if (!s_mp3->loop()) {
+        s_mp3->stop();
+        s_file->close();
+        amp_disable();
+        s_isPlayingAudio = false;
+        audio_hold_idle_bias();
+        LOG_AUDIO("MP3 播放结束");
       }
     }
   }
@@ -196,9 +280,9 @@ bool audio_is_playing() {
 }
 
 uint32_t audio_get_mp3_position() {
-  return 0; 
+  return 0;
 }
 
 uint32_t audio_get_mp3_duration() {
-  return 0; 
+  return 0;
 }

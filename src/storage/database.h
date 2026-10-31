@@ -2,7 +2,9 @@
 #include <Arduino.h>
 #include "config.h"
 
-#define MAX_TRACKS 32
+// 曲库容量上限。单条 TrackInfo 约 132 字节，80 首约占 10.5KB 静态 RAM，
+// 对 320KB 可用 RAM 来说可忽略；实测卡内 68 首可全部收录。
+#define MAX_TRACKS 80
 #define MAX_RECENT 10
 
 struct TrackInfo {

@@ -10,7 +10,7 @@
 // 项目与版本信息
 // ------------------------------------------------------------------------------
 #define PROJECT_NAME        "Bailan MP3 Player"
-#define PROJECT_VERSION     "v1.0.0"
+#define PROJECT_VERSION     "v1.1.2"
 #define PROJECT_EDITION     "正式版"
 #define PROJECT_AUTHOR      "摆烂233"
 #define HARDWARE_REVISION   "ESP32-2432S028R-Plus"
@@ -92,10 +92,22 @@
 #define SD_SPI_SPEED      4000000  // 4MHz 官方推荐稳定通信速率 (广泛兼容各品牌 MicroSD/TF 卡)
 
 // ---------- 4. 音频与功放 ----------
-#define AUDIO_PWM_PIN     26   // 板载标注“音频 PWM”，连接内部 DAC2 或 PWM 输入
-#define AUDIO_PWM_CHANNEL 0    // 音频波形使用的 LEDC 通道
+// 重要：本板【没有板载功放芯片】。
+// 官方说明书明确写着「2.0P 音频接口 = 预留音频接口，具体功能由用户程序定义」，
+// 该座子只是把 AUDIO_IN(GPIO26) 与 AUDIO_EN(GPIO4) 两个引脚引出，
+// 喇叭必须经过外接功放模块（如 PAM8302）才能发声。
+//
+// 音频输出通道选择
+//   0 = 内部 DAC2 (GPIO26)  -> 接外接功放的 IN+   【本板正确用法】
+//   1 = LEDC PWM  (GPIO27)  -> 备用方案，接扩展口
+#define AUDIO_OUTPUT_USE_PWM   0
+
+#define AUDIO_DAC_PIN     26   // AUDIO_IN，CN1 音频接口第 1 脚，内部 DAC2
+#define AUDIO_PWM_PIN     27   // 备用：CN3 扩展口引出的 IO27
+#define AUDIO_PWM_CHANNEL 0    // 音频 PWM 使用的 LEDC 通道 (1~3 已被 RGB 占用, 4 被背光占用)
 #define AUDIO_PWM_RES     8    // 8-bit 分辨率
-#define AMP_ENABLE_PIN    4    // 功放使能 (高电平有效)
+#define AUDIO_PWM_CARRIER 40000 // PWM 载波频率 40kHz，远高于人耳上限
+#define AMP_ENABLE_PIN    4    // AUDIO_EN，CN1 音频接口第 2 脚，接外接功放的 SD/EN 脚
 
 // ---------- 5. 电池电压检测 (ADC1) ----------
 #define BATTERY_ADC_PIN   34   // ADC1_CHANNEL_6 (仅输入引脚)

@@ -4,12 +4,23 @@
 
 static bool s_isDemoMode = true;
 
-static void scanDirectory(File dir, int depth) {
+// 已收集到的 MP3 路径（去重，最多 MAX_TRACKS 首）
+static String s_paths[MAX_TRACKS];
+static int s_pathCount = 0;
+
+static bool pathAlreadyCollected(const String& p) {
+  for (int i = 0; i < s_pathCount; i++) {
+    if (s_paths[i] == p) return true;
+  }
+  return false;
+}
+
+static void collectDir(File dir, int depth) {
   if (depth > 3) return; // 限制递归深度最多 3 层，保护堆栈
 
   while (true) {
     File entry = dir.openNextFile();
-    if (!entry) break;
+    if (!entry) break;   // 目录读完，或因读卡异常提前返回
 
     String name = entry.name();
     // 忽略隐藏文件与系统临时文件 (以 . 开头)
@@ -19,23 +30,28 @@ static void scanDirectory(File dir, int depth) {
     }
 
     if (entry.isDirectory()) {
-      scanDirectory(entry, depth + 1);
+      collectDir(entry, depth + 1);
     } else {
       String lowerName = name;
       lowerName.toLowerCase();
       if (lowerName.endsWith(".mp3")) {
-        // 截取文件名作为曲目名
-        int slashIdx = name.lastIndexOf('/');
-        String baseName = (slashIdx >= 0) ? name.substring(slashIdx + 1) : name;
-        int dotIdx = baseName.lastIndexOf('.');
-        String title = (dotIdx >= 0) ? baseName.substring(0, dotIdx) : baseName;
-
-        db_add_track(title.c_str(), "TF Card", entry.path(), 180, false);
-        LOG_SD("发现 MP3 音频: %s", entry.path());
+        if (s_pathCount < MAX_TRACKS) {
+          String p = entry.path();
+          if (!pathAlreadyCollected(p)) {
+            s_paths[s_pathCount++] = p;
+          }
+        }
       }
     }
     entry.close();
   }
+}
+
+static void collectFrom(const char* path) {
+  File dir = SD.open(path);
+  if (!dir) return;
+  collectDir(dir, 0);
+  dir.close();
 }
 
 void scanner_init() {
@@ -44,21 +60,43 @@ void scanner_init() {
 
 void scanner_scan_all() {
   db_clear();
+  s_pathCount = 0;
 
   if (sdcard_is_available()) {
     s_isDemoMode = false;
-    LOG_SD("开始扫描 TF 卡 /Music 目录...");
-    File musicDir = SD.open("/Music");
-    if (musicDir && musicDir.isDirectory()) {
-      scanDirectory(musicDir, 0);
-      musicDir.close();
+
+    // 优先扫描 /Music 目录，不存在则退回根目录
+    File probe = SD.open("/Music");
+    bool hasMusicDir = (probe && probe.isDirectory());
+    if (probe) probe.close();
+
+    const char* scanPath = hasMusicDir ? "/Music" : "/";
+    if (hasMusicDir) {
+      LOG_SD("开始扫描 TF 卡 /Music 目录 (最多 %d 首)...", MAX_TRACKS);
     } else {
-      LOG_SD("/Music 目录不存在，尝试根目录扫描...");
-      File rootDir = SD.open("/");
-      if (rootDir) {
-        scanDirectory(rootDir, 0);
-        rootDir.close();
-      }
+      LOG_SD("/Music 目录不存在，扫描根目录 (最多 %d 首)...", MAX_TRACKS);
+    }
+
+    // 大容量卡在 CYD 卡槽上可能出现"目录读到一半就中断"的情况。
+    // 多轮收集：每轮把新发现的曲目补进列表，直到不再有新增为止。
+    for (int attempt = 0; attempt < 3; attempt++) {
+      int before = s_pathCount;
+      collectFrom(scanPath);
+      LOG_SD("第 %d 轮扫描: 新增 %d 首，累计 %d 首",
+             attempt + 1, s_pathCount - before, s_pathCount);
+
+      if (s_pathCount >= MAX_TRACKS) break;
+      if (attempt > 0 && s_pathCount == before) break; // 本轮无进展，不再重试
+    }
+
+    for (int i = 0; i < s_pathCount; i++) {
+      String name = s_paths[i];
+      int slashIdx = name.lastIndexOf('/');
+      String baseName = (slashIdx >= 0) ? name.substring(slashIdx + 1) : name;
+      int dotIdx = baseName.lastIndexOf('.');
+      String title = (dotIdx >= 0) ? baseName.substring(0, dotIdx) : baseName;
+
+      db_add_track(title.c_str(), "TF Card", name.c_str(), 180, false);
     }
 
     if (db_get_track_count() == 0) {

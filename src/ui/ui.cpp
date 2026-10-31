@@ -18,6 +18,7 @@
 #include "hardware/battery.h"
 #include "hardware/audio.h"
 #include "storage/sdcard.h"
+#include "storage/scanner.h"
 #include "player/player.h"
 #include "system/settings_manager.h"
 #include "hardware/touch.h"
@@ -80,12 +81,28 @@ void ui_init() {
   font_draw_string_center(160, 220, "- 点击屏幕继续 -", COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
 
   // 等待触摸
+  // 注意：这个循环会阻塞主循环，因此在这里补做"后台家务"——
+  // 否则大容量卡在软复位后卡死时，用户重新插拔卡片也永远等不到重试机会。
   bool touched = false;
   int16_t tx, ty;
+  unsigned long lastSdRetry = 0;
+  uint8_t sdRetryCount = 0;
   while (!touched) {
     if (touch_read(tx, ty)) {
       touched = true;
     }
+
+    if (!touched && !sdcard_is_available() && sdRetryCount < 12) {
+      if (millis() - lastSdRetry >= 5000) {
+        lastSdRetry = millis();
+        sdRetryCount++;
+        LOG_SD("开机画面期间重试挂载 TF 卡 (第 %u 次)...", sdRetryCount);
+        if (sdcard_reinit()) {
+          scanner_scan_all();
+        }
+      }
+    }
+
     delay(50);
   }
 
@@ -164,6 +181,11 @@ UIPage ui_get_previous_page() {
 }
 
 void ui_update() {
+  // 息屏时跳过页面重绘：背光已关闭，重绘纯属浪费 CPU 与 SPI 带宽。
+  // 注意：校准页必须例外——它的触摸采样与 BOOT 键跳过逻辑都在 update 里，
+  // 一旦被跳过就再也无法唤醒，屏幕会永久黑屏。
+  if (display_is_sleeping() && s_currentPage != UI_PAGE_TOUCH_CAL) return;
+
   switch (s_currentPage) {
     case UI_PAGE_LOCKSCREEN:
       clock_ui_update();
