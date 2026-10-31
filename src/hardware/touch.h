@@ -46,3 +46,7 @@ bool touch_calibration_is_sane();
 
 // 当前是否使用用户实测校准（false = 正在用出厂默认值，坐标可能与实际屏不匹配）
 bool touch_has_user_calibration();
+
+// 硬件级 Light Sleep 睡前准备与唤醒引脚/时钟重建钩子
+void touch_sleep_prepare();
+void touch_wake_restore();

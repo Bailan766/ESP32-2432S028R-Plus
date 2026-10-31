@@ -112,8 +112,8 @@ void ui_init() {
     }
 
     // 超时自动进入，避免设备卡死在开机画面
-    if (millis() - splashStart > 10000) {
-      LOG_UI("开机画面: 10 秒无操作，自动进入系统");
+    if (millis() - splashStart > 2500) {
+      LOG_UI("开机画面: 展示完毕，自动进入系统");
       break;
     }
 

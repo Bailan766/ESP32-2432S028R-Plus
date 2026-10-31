@@ -55,29 +55,29 @@ static uint16_t spi24(uint8_t cmd) {
 }
 
 void touch_reset_default_calibration() {
-  // 根据官方硬件自检标准 (TS_MINX=300, TS_MAXX=3900, TS_MINY=400, TS_MAXY=3800)
+  // 本板 XPT2046 硬件通道与屏幕坐标系为交换轴结构（Screen X 取决于 rawY，Screen Y 取决于 rawX）
   if (s_touchRotation == 3) {
     // Rotation = 3 (USB 居左正向握持, 180度翻转)
     s_cal.valid = true;
-    s_cal.alphaX = -0.08861f;
-    s_cal.betaX  = 0.0f;
-    s_cal.deltaX = 345.58f;
+    s_cal.alphaX = 0.0008f;
+    s_cal.betaX  = -0.0858f;
+    s_cal.deltaX = 331.0f;
 
-    s_cal.alphaY = 0.0f;
-    s_cal.betaY  = -0.07029f;
-    s_cal.deltaY = 267.12f;
-    LOG_TOUCH("恢复出厂默认仿射校准 (Rotation=3, USB居左)");
+    s_cal.alphaY = -0.0742f;
+    s_cal.betaY  = 0.0029f;
+    s_cal.deltaY = 252.4f;
+    LOG_TOUCH("恢复出厂默认仿射校准 (Rotation=3, USB居左, 交换轴模型)");
   } else {
     // Rotation = 1 (USB 居右标准横屏)
     s_cal.valid = true;
-    s_cal.alphaX = 0.08861f;
-    s_cal.betaX  = 0.0f;
-    s_cal.deltaX = -26.58f;
+    s_cal.alphaX = -0.0008f;
+    s_cal.betaX  = 0.0858f;
+    s_cal.deltaX = -12.0f;
 
-    s_cal.alphaY = 0.0f;
-    s_cal.betaY  = 0.07029f;
-    s_cal.deltaY = -28.12f;
-    LOG_TOUCH("恢复出厂默认仿射校准 (Rotation=1, USB居右)");
+    s_cal.alphaY = 0.0742f;
+    s_cal.betaY  = -0.0029f;
+    s_cal.deltaY = -13.4f;
+    LOG_TOUCH("恢复出厂默认仿射校准 (Rotation=1, USB居右, 交换轴模型)");
   }
 }
 
@@ -419,4 +419,24 @@ bool touch_calibration_is_sane() {
 // 是否已加载到用户实测的校准参数（false 表示当前用的是出厂默认值）
 bool touch_has_user_calibration() {
   return s_hasUserCal;
+}
+
+void touch_sleep_prepare() {
+  // 睡前使能 XPT2046 内部 PENIRQ 50kΩ 上拉电阻并保持低功耗掉电态
+  digitalWrite(TOUCH_CS_PIN, LOW);
+  spi24(0xD0); // PD1=0, PD0=0: 启用 PENIRQ 并在转换间掉电
+  digitalWrite(TOUCH_CS_PIN, HIGH);
+  digitalWrite(TOUCH_SCK_PIN, LOW);
+}
+
+void touch_wake_restore() {
+  // 浅休眠唤醒后重设数字引脚模式与稳定状态
+  pinMode(TOUCH_SCK_PIN, OUTPUT);
+  pinMode(TOUCH_MOSI_PIN, OUTPUT);
+  pinMode(TOUCH_MISO_PIN, INPUT);
+  pinMode(TOUCH_CS_PIN, OUTPUT);
+  pinMode(TOUCH_IRQ_PIN, INPUT);
+
+  digitalWrite(TOUCH_CS_PIN, HIGH);
+  digitalWrite(TOUCH_SCK_PIN, LOW);
 }

@@ -101,6 +101,7 @@ bool battery_is_low() {
 }
 
 bool battery_is_usb_powered() {
-  // 处于 USB 供电或充电状态时，单节锂电池端电压通常达到 4.15V 以上
-  return s_batteryVoltage >= 4.15f;
+  // 处于 USB 供电或充电状态时，单节锂电池端电压通常达到 4.05V 以上；
+  // 或者未插入电池（电压 < 2.5V 且设备仍能运行），显然也是由 USB 供电
+  return (s_batteryVoltage >= 4.05f || s_batteryVoltage < 2.50f);
 }

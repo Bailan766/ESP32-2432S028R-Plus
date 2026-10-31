@@ -2,7 +2,7 @@
 
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-Compatible-orange.svg)](https://platformio.org/)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32--2432S028R--Plus-blue.svg)](docs/GPIO.md)
-[![Status](https://img.shields.io/badge/Version-v1.1.3-green.svg)](docs/CHANGELOG.md)
+[![Status](https://img.shields.io/badge/Version-v1.1.4-green.svg)](docs/CHANGELOG.md)
 
 基于 **ESP32-2432S028R Plus** 一体化电阻触屏开发板（CYD Plus）打造的开源、模块化、高可靠嵌入式便携式 MP3 播放器，兼具科技创新与智能硬件竞赛展示设计标准。
 
@@ -140,7 +140,7 @@ pio device monitor -b 115200
 开机将观察到统一标签化的日志输出：
 ```text
 [BOOT] ==================================================
-[BOOT]   Bailan MP3 Player v1.1.3 启动中...
+[BOOT]   Bailan MP3 Player v1.1.4 启动中...
 [BOOT]   硬件目标: ESP32-2432S028R-Plus
 [BOOT] ==================================================
 [SYS] 正在从 NVS 读取持久化配置...
