@@ -11,3 +11,6 @@
 
 # 串口调试抓取产物
 tools/*.txt
+
+# Release 构建产物
+dist/
