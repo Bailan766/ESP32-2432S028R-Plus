@@ -37,3 +37,12 @@ void touch_save_calibration();
 void touch_reset_default_calibration();
 void touch_set_rotation(uint8_t rotation);
 uint8_t touch_get_rotation();
+
+// 校准数据合理性自检
+// 正常标定下 X 主要由 rawX 决定、Y 主要由 rawY 决定，主系数应在 0.05~0.15 量级；
+// 若主系数接近 0 而交叉项很大，说明 4 点采样点错了位置（矩阵被转置/镜像），
+// 此时触摸坐标会整体错乱（点左下会跳到右上），必须重新校准。
+bool touch_calibration_is_sane();
+
+// 当前是否使用用户实测校准（false = 正在用出厂默认值，坐标可能与实际屏不匹配）
+bool touch_has_user_calibration();

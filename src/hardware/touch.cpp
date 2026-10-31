@@ -5,6 +5,9 @@
 
 static Preferences s_prefs;
 static TouchCalibrationCoeffs s_cal;
+// 是否加载到了【用户实测】的校准（而非出厂默认值）。
+// 默认值只是经验参数，与本块屏未必匹配；没有用户校准时应当引导重新校准。
+static bool s_hasUserCal = false;
 
 static uint16_t s_lastRawX = 0;
 static uint16_t s_lastRawY = 0;
@@ -128,6 +131,7 @@ static void loadCalibration() {
                 s_touchRotation,
                 s_cal.alphaX, s_cal.betaX, s_cal.deltaX,
                 s_cal.alphaY, s_cal.betaY, s_cal.deltaY);
+      s_hasUserCal = true;
       return;
     }
   }
@@ -384,4 +388,35 @@ bool touch_calibrate_from_4points(const int screenX[4], const int screenY[4],
 
   touch_save_calibration();
   return true;
+}
+
+// ------------------------------------------------------------------------------
+// 校准数据合理性自检
+//
+// ⚠️ 不能用 alphaX / betaY 单独判断！
+//    本板 XPT2046 的 X/Y 通道与屏幕坐标轴是【交换】的：实测校准结果为
+//      alphaX≈0.0008  betaX≈-0.0858   (X 主要由 rawY 决定)
+//      alphaY≈-0.0742 betaY≈0.0029    (Y 主要由 rawX 决定)
+//    这是完全正常的仿射解，若按"主系数应该大"来判断会把好数据误杀，
+//    导致每次开机都被强制重新校准。
+//
+// 改用【行列式】判断：
+//    det = alphaX*betaY - betaX*alphaY
+//    |det| 表示原始计数到屏幕像素的整体缩放比例，正常标定约 0.005~0.01；
+//    退化矩阵（4 点共线、重复点击）会让 |det| 趋近 0，这才是真正需要重校的情况。
+// ------------------------------------------------------------------------------
+bool touch_calibration_is_sane() {
+  if (!s_cal.valid) return false;
+
+  const float det = s_cal.alphaX * s_cal.betaY - s_cal.betaX * s_cal.alphaY;
+  if (isnan(det) || fabsf(det) < 1e-4f || fabsf(det) > 0.1f) {
+    LOG_TOUCH("校准自检失败: 行列式 %.6f 超出合理范围", det);
+    return false;
+  }
+  return true;
+}
+
+// 是否已加载到用户实测的校准参数（false 表示当前用的是出厂默认值）
+bool touch_has_user_calibration() {
+  return s_hasUserCal;
 }

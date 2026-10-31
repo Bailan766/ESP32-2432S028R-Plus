@@ -2,7 +2,7 @@
 
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-Compatible-orange.svg)](https://platformio.org/)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32--2432S028R--Plus-blue.svg)](docs/GPIO.md)
-[![Status](https://img.shields.io/badge/Version-v1.1.2-green.svg)](docs/CHANGELOG.md)
+[![Status](https://img.shields.io/badge/Version-v1.1.3-green.svg)](docs/CHANGELOG.md)
 
 基于 **ESP32-2432S028R Plus** 一体化电阻触屏开发板（CYD Plus）打造的开源、模块化、高可靠嵌入式便携式 MP3 播放器，兼具科技创新与智能硬件竞赛展示设计标准。
 
@@ -140,7 +140,7 @@ pio device monitor -b 115200
 开机将观察到统一标签化的日志输出：
 ```text
 [BOOT] ==================================================
-[BOOT]   Bailan MP3 Player v1.1.2 启动中...
+[BOOT]   Bailan MP3 Player v1.1.3 启动中...
 [BOOT]   硬件目标: ESP32-2432S028R-Plus
 [BOOT] ==================================================
 [SYS] 正在从 NVS 读取持久化配置...
@@ -175,6 +175,19 @@ pio device monitor -b 115200
 ### 备用方案：外接功放
 
 若板载 8002 损坏，可用 PAM8302 等外接模块：CN1 的 GPIO26 → 模块 `IN+`，GPIO4 → 模块 `SD`，模块 `VIN`/`GND` 从板子取电，喇叭接模块输出。若改用 GPIO27 输出，把 `AUDIO_OUTPUT_USE_PWM` 改为 `1` 即可切换到 40kHz PWM（建议在 `IN+` 前加 1kΩ + 10nF 低通）。
+
+## 🎯 触屏校准（触摸失灵时的救命通道）
+
+**长按实体 BOOT 键 → 直接进入触屏校准页**，不依赖触摸。
+
+这条入口专为「校准数据损坏导致所有按钮错位」的情况准备：此时点哪里都不对，无法通过设置页进入校准，只能用物理按键。
+
+校准页会自动把背光拉到 100%，按屏幕四个角的红色十字中心依次点击即可；校准页内**短按 BOOT 键**可跳过退出。
+
+> 校准完成后参数写入 NVS，下次开机自动加载。
+> 若加载到的参数异常（主系数接近 0，说明采样点被打乱、矩阵转置），固件会打印自检失败日志并强制重新校准。
+
+---
 
 ## 💾 TF 卡使用说明（重要）
 

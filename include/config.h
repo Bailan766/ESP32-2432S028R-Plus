@@ -10,7 +10,7 @@
 // 项目与版本信息
 // ------------------------------------------------------------------------------
 #define PROJECT_NAME        "Bailan MP3 Player"
-#define PROJECT_VERSION     "v1.1.2"
+#define PROJECT_VERSION     "v1.1.3"
 #define PROJECT_EDITION     "正式版"
 #define PROJECT_AUTHOR      "摆烂233"
 #define HARDWARE_REVISION   "ESP32-2432S028R-Plus"
@@ -108,6 +108,14 @@
 #define AUDIO_PWM_RES     8    // 8-bit 分辨率
 #define AUDIO_PWM_CARRIER 40000 // PWM 载波频率 40kHz，远高于人耳上限
 #define AMP_ENABLE_PIN    4    // AUDIO_EN，CN1 音频接口第 2 脚，接外接功放的 SD/EN 脚
+
+// ---------- 4.1 息屏浅睡眠 (light sleep) ----------
+// ⚠️ 实测问题（2026-10-31）：启用后息屏即"假死"——屏幕不再唤醒、触摸无响应。
+//    原因是本项目的触摸是【软件 SPI】(GPIO25/32/33/39)，而 light sleep 唤醒后
+//    GPIO 的数字化功能状态不可靠，位翻转时序被打乱，touch_read() 再也读不到按下。
+//    除非在每次唤醒后完整重建触摸引脚（且验证有效），否则不要开启。
+#define POWER_LIGHT_SLEEP      0     // 1=启用, 0=关闭（当前保持关闭）
+#define POWER_SLEEP_CHUNK_MS   200   // 每次浅睡时长，同时也是触摸唤醒的最大延迟
 
 // ---------- 5. 电池电压检测 (ADC1) ----------
 #define BATTERY_ADC_PIN   34   // ADC1_CHANNEL_6 (仅输入引脚)

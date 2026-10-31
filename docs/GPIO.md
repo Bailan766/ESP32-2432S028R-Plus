@@ -1,6 +1,6 @@
 # ESP32-2432S028R Plus 硬件管脚与电路分析规范 (GPIO.md)
 
-> **版本**: v1.1.2  
+> **版本**: v1.1.3  
 > **适用开发板**: ESP32-2432S028R Plus (俗称 CYD Plus 黄板一体化触屏开发板)  
 > **核心微控制器**: ESP32-D0WD-V3 (Xtensa Dual-Core 32-bit LX6 @ 240MHz, 520KB SRAM, 无外部 PSRAM)
 

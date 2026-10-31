@@ -89,6 +89,18 @@ void setup() {
   touch_init();
   touch_set_rotation(settings_get().screenRotation);
 
+  // 校准数据自检：
+  //   1) 没有加载到用户实测校准（当前用的是出厂默认值，与本块屏未必匹配）
+  //   2) 或矩阵异常（主系数接近 0，说明采样点被打乱、矩阵被转置）
+  // 这两种情况都会让触摸整体错位（点左下跳到右上），用户完全无法操作。
+  // 此时强制进入开机校准流程，给出一条不需要按键、不需要触摸的自救路径。
+  // 注意只改内存中的开关、不写 NVS，校准成功后下次开机自然恢复正常。
+  if (!touch_has_user_calibration() || !touch_calibration_is_sane()) {
+    LOG_SYS("触摸校准不可用 (用户校准=%s)，本次开机强制进入校准流程",
+            touch_has_user_calibration() ? "有" : "无");
+    settings_get().bootCalibrate = true;
+  }
+
   // 10. 初始化播放引擎与最近播放
   player_init();
   player_set_mode((PlayMode)settings_get().playMode);
@@ -167,7 +179,13 @@ void loop() {
   // 2. 实体按键轮询检测 (BOOT 短按/长按)
   ButtonEvent btnEvt = button_update();
   if (btnEvt != BTN_EVENT_NONE) {
+    // 关键：按键必须能唤醒屏幕。此前只重置了计时器没唤醒，
+    // 息屏后按 BOOT 毫无反应，用户会以为设备死机。
+    if (power_is_screen_sleeping()) {
+      power_wake_screen();
+    }
     power_reset_inactivity_timer();
+
     if (btnEvt == BTN_EVENT_CLICK) {
       ui_handle_button_click();
     } else if (btnEvt == BTN_EVENT_LONG_PRESS) {
@@ -221,7 +239,12 @@ void loop() {
     }
   }
 
-  // 13. 释放极微弱时间片保证看门狗与后台任务运行
-  //     息屏时降低轮询频率，减少 CPU 唤醒次数（配合 power_manager 的降频）
-  delay(power_is_screen_sleeping() ? 20 : 4);
+  // 13. 息屏且空闲时进入浅睡眠，把 ESP32 自身电流从约 20mA 压到约 1mA。
+  //     用定时器 200ms 轮询唤醒，触摸响应延迟不超过 200ms。
+  //     不满足条件（亮屏 / 播放中 / 射频开启）时退回普通延时。
+  if (power_can_light_sleep()) {
+    power_light_sleep(POWER_SLEEP_CHUNK_MS);
+  } else {
+    delay(power_is_screen_sleeping() ? 20 : 4);
+  }
 }

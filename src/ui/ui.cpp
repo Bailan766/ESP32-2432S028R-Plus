@@ -19,6 +19,7 @@
 #include "hardware/audio.h"
 #include "storage/sdcard.h"
 #include "storage/scanner.h"
+#include "hardware/buttons.h"
 #include "player/player.h"
 #include "system/settings_manager.h"
 #include "hardware/touch.h"
@@ -81,18 +82,48 @@ void ui_init() {
   font_draw_string_center(160, 220, "- 点击屏幕继续 -", COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
 
   // 等待触摸
-  // 注意：这个循环会阻塞主循环，因此在这里补做"后台家务"——
-  // 否则大容量卡在软复位后卡死时，用户重新插拔卡片也永远等不到重试机会。
+  // 注意 1：这个循环会阻塞主循环，因此在这里补做"后台家务"——
+  //         否则大容量卡在软复位后卡死时，用户重新插拔卡片也永远等不到重试机会。
+  // 注意 2：必须同时轮询实体按键。若触摸校准损坏导致点哪里都不对，用户连这一屏
+  //         都过不去，长按 BOOT 进校准就成了唯一的自救通道。
   bool touched = false;
+  bool goCalibration = false;
   int16_t tx, ty;
+  unsigned long splashStart = millis();
   unsigned long lastSdRetry = 0;
   uint8_t sdRetryCount = 0;
+
   while (!touched) {
     if (touch_read(tx, ty)) {
       touched = true;
+      break;
     }
 
-    if (!touched && !sdcard_is_available() && sdRetryCount < 12) {
+    // 物理按键兜底
+    ButtonEvent evt = button_update();
+    if (evt == BTN_EVENT_LONG_PRESS) {
+      LOG_UI("开机画面: BOOT 长按 -> 进入触屏校准");
+      goCalibration = true;
+      break;
+    }
+    if (evt == BTN_EVENT_CLICK) {
+      LOG_UI("开机画面: BOOT 短按 -> 跳过等待");
+      break;
+    }
+
+    // 超时自动进入，避免设备卡死在开机画面
+    if (millis() - splashStart > 10000) {
+      LOG_UI("开机画面: 10 秒无操作，自动进入系统");
+      break;
+    }
+
+    // 开机画面期间补试挂载 TF 卡。
+    // 每次重试会阻塞数秒（5 级降频 + 总线恢复），期间无法采样触摸与按键，
+    // 因此：
+    //   1) 只在【不需要进校准】时才补试 —— 校准是优先级最高的自救流程，
+    //      不能因为等 SD 卡而把用户卡在开机画面几十秒；
+    //   2) 最多补试 2 次，后续交给主循环的后台重试。
+    if (!sdcard_is_available() && !settings_get().bootCalibrate && sdRetryCount < 2) {
       if (millis() - lastSdRetry >= 5000) {
         lastSdRetry = millis();
         sdRetryCount++;
@@ -109,8 +140,10 @@ void ui_init() {
   // 防止点击事件立即穿透到下一个界面
   delay(200); 
 
-  if (settings_get().bootCalibrate) {
-    LOG_UI("检测到强制开机自动校准，直接跳转校准页面");
+  if (goCalibration || settings_get().bootCalibrate) {
+    if (settings_get().bootCalibrate) {
+      LOG_UI("检测到强制开机自动校准，直接跳转校准页面");
+    }
     ui_switch_to(UI_PAGE_TOUCH_CAL);
   } else {
     ui_switch_to(UI_PAGE_LOCKSCREEN);
@@ -344,6 +377,10 @@ void ui_handle_button_click() {
 }
 
 void ui_handle_button_long_press() {
-  LOG_UI("实体按键 BOOT 长按 -> 重启设备");
-  ESP.restart();
+  // 长按 BOOT 键 -> 进入触屏校准
+  // 这是触摸失灵时唯一的"物理救命通道"：校准数据损坏会导致所有按钮错位，
+  // 此时用户无法通过触摸进入设置页，必须留一条不依赖触摸的入口。
+  LOG_UI("实体按键 BOOT 长按 -> 进入触屏校准");
+  audio_test_beep(1000, 80);
+  ui_switch_to(UI_PAGE_TOUCH_CAL);
 }

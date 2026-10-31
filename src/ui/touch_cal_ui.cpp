@@ -124,8 +124,14 @@ void touch_cal_ui_enter() {
 void touch_cal_ui_update() {
   TFT_eSPI& tft = display_get_tft();
 
-  // 无论处于 4点采集阶段 还是 画板阶段，短按物理 BOOT 键直接跳过/退出校准
-  if (millis() - s_enterTime > 300 && button_is_pressed()) {
+  // 无论处于 4点采集阶段 还是 画板阶段，短按物理 BOOT 键直接跳过/退出校准。
+  // 必须等按键先松开一次再允许退出：否则"长按 BOOT 进入校准"时按键还按着，
+  // 300ms 后会立刻被判为"再次按下"而直接退出，等于进不去。
+  static bool s_btnReleased = false;
+  if (!button_is_pressed()) {
+    s_btnReleased = true;
+  }
+  if (s_btnReleased && millis() - s_enterTime > 300 && button_is_pressed()) {
     audio_test_beep(1000, 60);
     exitCalibration();
     return;
