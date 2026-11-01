@@ -1,5 +1,6 @@
 #include "home.h"
 #include "ui.h"
+#include "ui_theme.h"
 #include "font_cn.h"
 #include "hardware/display.h"
 #include "hardware/audio.h"
@@ -12,124 +13,143 @@
 static PlayerState s_lastPlayerState = STATE_STOPPED;
 static const TrackInfo* s_lastTrack = nullptr;
 static unsigned long s_lastHomeUpdate = 0;
+static uint16_t s_lastElapsed = 0;
 
-static void renderCard0() {
+static void renderHeroPlayerCard() {
   TFT_eSPI& tft = display_get_tft();
-  int16_t x = 14, y = 35, w = 140, h = 48;
+  int16_t x = 10, y = 34, w = 300, h = 56;
 
   PlayerState st = player_get_state();
   const TrackInfo* curTrack = player_get_current_track();
+  bool playing = (st == STATE_PLAYING);
+  bool paused = (st == STATE_PAUSED);
 
-  const char* title = "音乐播放";
-  const char* sub = "点击进入播放器";
-  uint16_t color = 0x05E0; // 翠绿
+  // 1. 卡片哑光底座与微弱分割轮廓
+  tft.fillRoundRect(x, y, w, h, 6, UI_COL_SURFACE);
+  tft.drawRoundRect(x, y, w, h, 6, playing ? UI_COL_BORDER_LIGHT : UI_COL_BORDER_SUBTLE);
 
-  if (st == STATE_PLAYING) {
-    title = "正在播放";
-    color = 0x07E0; // 高亮荧光绿
-    if (curTrack && strlen(curTrack->title) > 0) {
-      sub = curTrack->title;
-    } else {
-      sub = "正在播放中";
-    }
-  } else if (st == STATE_PAUSED) {
-    title = "播放暂停";
-    color = COLOR_ACCENT_ORANGE;
-    if (curTrack && strlen(curTrack->title) > 0) {
-      sub = curTrack->title;
-    } else {
-      sub = "点击继续播放";
-    }
+  // 2. 左侧主状态垂直指示条 (3px)
+  uint16_t accentCol = playing ? UI_COL_AMBER : (paused ? UI_COL_CYAN : UI_COL_BORDER_LIGHT);
+  tft.fillRect(x + 2, y + 8, 3, h - 16, accentCol);
+
+  // 3. 动态状态图标
+  int iconX = x + 12, iconY = y + 14;
+  if (playing) {
+    tft.fillRoundRect(iconX, iconY, 20, 20, 4, UI_COL_AMBER_DIM);
+    tft.drawRoundRect(iconX, iconY, 20, 20, 4, UI_COL_AMBER);
+    tft.fillTriangle(iconX + 7, iconY + 5, iconX + 7, iconY + 15, iconX + 15, iconY + 10, UI_COL_AMBER);
+  } else if (paused) {
+    tft.fillRoundRect(iconX, iconY, 20, 20, 4, UI_COL_SURFACE_HIGH);
+    tft.drawRoundRect(iconX, iconY, 20, 20, 4, UI_COL_CYAN);
+    tft.fillRect(iconX + 6, iconY + 5, 3, 10, UI_COL_CYAN);
+    tft.fillRect(iconX + 11, iconY + 5, 3, 10, UI_COL_CYAN);
+  } else {
+    tft.fillRoundRect(iconX, iconY, 20, 20, 4, UI_COL_SURFACE_HIGH);
+    tft.drawRoundRect(iconX, iconY, 20, 20, 4, UI_COL_BORDER_LIGHT);
+    tft.fillRect(iconX + 6, iconY + 6, 8, 8, UI_COL_TEXT_MUTED);
   }
 
-  tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(x, y, w, h, 6, color);
+  // 4. 曲目名称与艺术家/规格 (x: 40 ~ 216, 宽 176)
+  char titleBuf[32];
+  if (curTrack && strlen(curTrack->title) > 0) {
+    snprintf(titleBuf, sizeof(titleBuf), "%s", curTrack->title);
+  } else {
+    snprintf(titleBuf, sizeof(titleBuf), "%s", "未选择曲目");
+  }
 
-  font_draw_string(x + 12, y + 7, title, color, COLOR_PANEL_BG, 1);
-  font_draw_string(x + 12, y + 26, sub, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  // 清除文字背景区域防重叠
+  tft.fillRect(x + 38, y + 8, 172, 36, UI_COL_SURFACE);
+  font_draw_string(x + 38, y + 8, titleBuf, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+
+  char subBuf[48];
+  if (curTrack && strlen(curTrack->artist) > 0) {
+    snprintf(subBuf, sizeof(subBuf), "%s · 44.1kHz DAC2", curTrack->artist);
+  } else {
+    snprintf(subBuf, sizeof(subBuf), "点击进入完整播放器");
+  }
+  font_draw_string(x + 38, y + 28, subBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+
+  // 5. 右侧状态指示药丸胶囊 (x: 216, y: 44, w: 86, h: 26)
+  int pillX = x + w - 88, pillY = y + 14, pillW = 80, pillH = 26;
+  if (playing) {
+    ui_theme_draw_pill_btn(pillX, pillY, pillW, pillH, "正在播放", UI_COL_AMBER, UI_COL_AMBER_DIM, UI_COL_AMBER);
+  } else if (paused) {
+    ui_theme_draw_pill_btn(pillX, pillY, pillW, pillH, "播放暂停", UI_COL_CYAN, UI_COL_SURFACE_HIGH, UI_COL_CYAN);
+  } else {
+    ui_theme_draw_pill_btn(pillX, pillY, pillW, pillH, "待机就绪", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+  }
+
+  // 6. 底沿微刻度时间轴进度条 (y: y + h - 3, h = 2)
+  uint16_t elapsed = player_get_elapsed_seconds();
+  uint16_t total = player_get_total_seconds();
+  if (total == 0) total = 180;
+  int progW = (int)((long)elapsed * (w - 8) / total);
+  progW = constrain(progW, 0, w - 8);
+
+  tft.fillRect(x + 4, y + h - 3, w - 8, 2, UI_COL_BORDER_SUBTLE);
+  if (progW > 0 && playing) {
+    tft.fillRect(x + 4, y + h - 3, progW, 2, UI_COL_AMBER);
+  }
+}
+
+static void renderGridCard(int16_t x, int16_t y, int16_t w, int16_t h,
+                           const char* title, const char* sub, uint16_t dotCol) {
+  TFT_eSPI& tft = display_get_tft();
+  tft.fillRoundRect(x, y, w, h, 6, UI_COL_SURFACE);
+  tft.drawRoundRect(x, y, w, h, 6, UI_COL_BORDER_SUBTLE);
+
+  // 左侧微圆点指示器
+  tft.fillCircle(x + 12, y + 14, 3, dotCol);
+
+  // 标题与副标题
+  font_draw_string(x + 22, y + 6, title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+  font_draw_string(x + 22, y + 24, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 }
 
 void home_enter() {
   TFT_eSPI& tft = display_get_tft();
-  tft.fillScreen(COLOR_BG_DARK);
+  tft.fillScreen(UI_COL_BG);
 
   ui_draw_header("摆烂播放器", false);
 
-  // 卡片 0: 动态播放器卡片 (Row 0, Col 0: x=14, y=35, w=140, h=48)
-  renderCard0();
+  // 1. 上位 Hero 播放控制主舱 (x: 10, y: 34, w: 300, h: 56)
+  renderHeroPlayerCard();
   s_lastPlayerState = player_get_state();
   s_lastTrack = player_get_current_track();
+  s_lastElapsed = player_get_elapsed_seconds();
 
-  // 卡片 1: TXT 小说阅读 (Row 0, Col 1: x=166, y=35, w=140, h=48)
-  {
-    int16_t x = 166, y = 35, w = 140, h = 48;
-    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
-    tft.drawRoundRect(x, y, w, h, 6, COLOR_ACCENT_CYAN);
-    font_draw_string(x + 12, y + 7, "小说阅读", COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+  // 2. 中位 2x2 极简功能舱 (y: 96 ~ 188)
+  // Row 0, Col 0: 曲库音乐 (x: 10, y: 96, w: 146, h: 44)
+  char musicSub[32];
+  snprintf(musicSub, sizeof(musicSub), "本地曲目 (%d首)", db_get_track_count());
+  renderGridCard(10, 96, 146, 44, "曲库音乐", musicSub, UI_COL_AMBER);
 
-    char subBuf[32];
-    snprintf(subBuf, sizeof(subBuf), "书架 (%d本)", novel_get_count());
-    font_draw_string(x + 12, y + 26, subBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
-  }
+  // Row 0, Col 1: 文墨书架 (x: 164, y: 96, w: 146, h: 44)
+  char novelSub[32];
+  snprintf(novelSub, sizeof(novelSub), "TXT小说 (%d本)", novel_get_count());
+  renderGridCard(164, 96, 146, 44, "文墨书架", novelSub, UI_COL_CYAN);
 
-  // 卡片 2: 目录文件 / 曲库 (Row 1, Col 0: x=14, y=88, w=140, h=48)
-  {
-    int16_t x = 14, y = 88, w = 140, h = 48;
-    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
-    tft.drawRoundRect(x, y, w, h, 6, 0xFD20);
-    font_draw_string(x + 12, y + 7, "音乐曲库", 0xFD20, COLOR_PANEL_BG, 1);
+  // Row 1, Col 0: 极客大厅 (x: 10, y: 146, w: 146, h: 44)
+  renderGridCard(10, 146, 146, 44, "极客大厅", "电台·传书·摸鱼", UI_COL_GREEN);
 
-    char subBuf[32];
-    snprintf(subBuf, sizeof(subBuf), "歌曲文件 (%d首)", db_get_track_count());
-    font_draw_string(x + 12, y + 26, subBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
-  }
+  // Row 1, Col 1: 系统控制 (x: 164, y: 146, w: 146, h: 44)
+  renderGridCard(164, 146, 146, 44, "系统控制", "耗电曲线·硬件管理", UI_COL_TEXT_MUTED);
 
-  // 卡片 3: 最近播放 (Row 1, Col 1: x=166, y=88, w=140, h=48)
-  {
-    int16_t x = 166, y = 88, w = 140, h = 48;
-    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
-    tft.drawRoundRect(x, y, w, h, 6, 0x04DF);
-    font_draw_string(x + 12, y + 7, "最近播放", 0x04DF, COLOR_PANEL_BG, 1);
-
-    char subBuf[32];
-    snprintf(subBuf, sizeof(subBuf), "历史记录 (%d首)", db_get_recent_count());
-    font_draw_string(x + 12, y + 26, subBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
-  }
-
-  // 卡片 4: 系统设置 (Row 2, Col 0: x=14, y=141, w=140, h=48)
-  {
-    int16_t x = 14, y = 141, w = 140, h = 48;
-    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
-    tft.drawRoundRect(x, y, w, h, 6, 0x92BB);
-    font_draw_string(x + 12, y + 7, "系统设置", 0x92BB, COLOR_PANEL_BG, 1);
-    font_draw_string(x + 12, y + 26, "参数与硬件管理", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
-  }
-
-  // 卡片 5: 摸鱼大厅 / 经典游戏 (Row 2, Col 1: x=166, y=141, w=140, h=48)
-  {
-    int16_t x = 166, y = 141, w = 140, h = 48;
-    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
-    tft.drawRoundRect(x, y, w, h, 6, 0xFD20);
-    font_draw_string(x + 12, y + 7, "摸鱼大厅", 0xFD20, COLOR_PANEL_BG, 1);
-    font_draw_string(x + 12, y + 26, "2048 / 电子木鱼", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
-  }
-
-  // 底部左右双栏 (x: 14, y: 194, w: 292, h: 36)
-  // 左侧: TF 卡状态 (x: 14, y: 194, w: 160, h: 36)
-  tft.fillRoundRect(14, 194, 160, 36, 6, 0x10A2);
-  tft.drawRoundRect(14, 194, 160, 36, 6, COLOR_PANEL_BORDER);
+  // 3. 下位极客底座栏 (y: 196 ~ 234, h = 38, 3 个微胶囊按钮)
+  // Left: TF 卡状态 (x: 10, w: 96)
   if (sdcard_is_available()) {
-    char buf[32];
-    snprintf(buf, sizeof(buf), "TF: %uM (点此重扫)", sdcard_get_size_mb());
-    font_draw_string_center(94, 204, buf, TFT_GREEN, 0x10A2, 1);
+    char tfBuf[32];
+    snprintf(tfBuf, sizeof(tfBuf), "TF:%uM就绪", sdcard_get_size_mb());
+    ui_theme_draw_pill_btn(10, 196, 96, 36, tfBuf, UI_COL_GREEN, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
   } else {
-    font_draw_string_center(94, 204, "TF卡: 点击手动挂载", TFT_YELLOW, 0x10A2, 1);
+    ui_theme_draw_pill_btn(10, 196, 96, 36, "TF:点击挂载", UI_COL_AMBER, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
   }
 
-  // 右侧: 蓝牙音箱快捷入口 (x: 180, y: 194, w: 126, h: 36)
-  tft.fillRoundRect(180, 194, 126, 36, 6, 0x0210);
-  tft.drawRoundRect(180, 194, 126, 36, 6, COLOR_ACCENT_CYAN);
-  font_draw_string_center(243, 204, "蓝牙音箱", COLOR_ACCENT_CYAN, 0x0210, 1);
+  // Center: 蓝牙音箱快捷 (x: 112, w: 96)
+  ui_theme_draw_pill_btn(112, 196, 96, 36, "蓝牙音箱", UI_COL_CYAN, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
+
+  // Right: 桌面时钟快捷 (x: 214, w: 96)
+  ui_theme_draw_pill_btn(214, 196, 96, 36, "桌面时钟", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
 }
 
 void home_update() {
@@ -137,35 +157,28 @@ void home_update() {
     s_lastHomeUpdate = millis();
     PlayerState st = player_get_state();
     const TrackInfo* curTrack = player_get_current_track();
+    uint16_t el = player_get_elapsed_seconds();
 
-    if (st != s_lastPlayerState || curTrack != s_lastTrack) {
+    if (st != s_lastPlayerState || curTrack != s_lastTrack || (st == STATE_PLAYING && abs((int)el - (int)s_lastElapsed) >= 1)) {
       s_lastPlayerState = st;
       s_lastTrack = curTrack;
-      renderCard0();
+      s_lastElapsed = el;
+      renderHeroPlayerCard();
     }
   }
 }
 
 void home_handle_touch(int16_t x, int16_t y) {
   if (y < 30) {
-    // 顶部状态栏
     return;
   }
 
-  // 底部栏 (y >= 192):
-  if (y >= 192) {
-    if (x >= 175) {
-      // 点击右侧 [蓝牙音箱]
-      audio_test_beep(1800, 40);
-      ui_switch_to(UI_PAGE_BLUETOOTH_SINK);
-    } else {
+  // 1. 下位底座栏 (y >= 194)
+  if (y >= 194) {
+    if (x < 110) {
       // 点击左侧 [TF 卡手动挂载 / 重扫]
       audio_test_beep(2000, 80);
-      TFT_eSPI& tft = display_get_tft();
-      tft.fillRoundRect(14, 194, 160, 36, 6, 0x2104);
-      tft.drawRoundRect(14, 194, 160, 36, 6, COLOR_ACCENT_CYAN);
-      font_draw_string_center(94, 204, "正在挂载...", COLOR_ACCENT_CYAN, 0x2104, 1);
-
+      ui_theme_draw_pill_btn(10, 196, 96, 36, "挂载中...", UI_COL_AMBER, UI_COL_SURFACE_HIGH, UI_COL_AMBER);
       bool ok = sdcard_reinit(true);
       if (ok) {
         scanner_scan_all();
@@ -175,26 +188,45 @@ void home_handle_touch(int16_t x, int16_t y) {
         audio_test_beep(800, 200);
       }
       home_enter();
+      return;
+    } else if (x < 210) {
+      // 点击中间 [蓝牙音箱]
+      audio_test_beep(1800, 40);
+      ui_switch_to(UI_PAGE_BLUETOOTH_SINK);
+      return;
+    } else {
+      // 点击右侧 [桌面时钟]
+      audio_test_beep(1400, 40);
+      ui_switch_to(UI_PAGE_LOCKSCREEN);
+      return;
     }
+  }
+
+  // 2. 上位 Hero 播放控制舱 (y: 32 ~ 92)
+  if (y >= 32 && y <= 92) {
+    audio_test_beep(1200, 30);
+    ui_switch_to(UI_PAGE_PLAYER);
     return;
   }
 
-  // 6 大卡片网格划分 (x分界 160; y分界 86, 139):
-  if (x < 160) {
-    if (y < 86) {
-      ui_switch_to(UI_PAGE_PLAYER);       // 左上: 音乐播放
-    } else if (y < 139) {
-      ui_switch_to(UI_PAGE_MUSIC_LIST);   // 左中: 音乐曲库
+  // 3. 中位 2x2 功能舱 (y: 93 ~ 193)
+  if (y < 144) {
+    // Row 0 (y: 93 ~ 143)
+    if (x < 160) {
+      audio_test_beep(1000, 30);
+      ui_switch_to(UI_PAGE_MUSIC_LIST); // 左上: 曲库音乐
     } else {
-      ui_switch_to(UI_PAGE_SETTINGS);     // 左下: 系统设置
+      audio_test_beep(1000, 30);
+      ui_switch_to(UI_PAGE_NOVEL_LIST); // 右上: 文墨书架
     }
   } else {
-    if (y < 86) {
-      ui_switch_to(UI_PAGE_NOVEL_LIST);   // 右上: 小说阅读 (TXT 书架)
-    } else if (y < 139) {
-      ui_switch_to(UI_PAGE_RECENT_LIST);  // 右中: 最近播放
+    // Row 1 (y: 144 ~ 193)
+    if (x < 160) {
+      audio_test_beep(1000, 30);
+      ui_switch_to(UI_PAGE_GAME_MENU);  // 左下: 极客大厅 (电台/传书/游戏/翻页钟)
     } else {
-      ui_switch_to(UI_PAGE_GAME_MENU);    // 右下: 摸鱼大厅 (2048 / 木鱼)
+      audio_test_beep(1000, 30);
+      ui_switch_to(UI_PAGE_SETTINGS);   // 右下: 系统控制 (设置/耗电曲线/自检)
     }
   }
 }

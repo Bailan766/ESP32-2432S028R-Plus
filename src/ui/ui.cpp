@@ -2,6 +2,7 @@
 #include "web_radio_ui.h"
 #include "battery_curve_ui.h"
 #include "ui.h"
+#include "ui_theme.h"
 #include "font_cn.h"
 #include "home.h"
 #include "music_list.h"
@@ -36,33 +37,36 @@ void ui_draw_header(const char* title, bool showBackBtn) {
   TFT_eSPI& tft = display_get_tft();
 
   // 顶部黑底区域 (高度 30px)
-  tft.fillRect(0, 0, 320, 30, COLOR_BG_DARK);
-  tft.drawLine(0, 30, 320, 30, COLOR_PANEL_BORDER);
+  tft.fillRect(0, 0, 320, 30, UI_COL_BG);
+  tft.drawLine(0, 29, 320, 29, UI_COL_BORDER_SUBTLE);
 
-  // 返回按钮 (更醒目、更大尺寸)
+  // 返回按钮 (更精致的药丸胶囊)
   if (showBackBtn) {
-    tft.fillRoundRect(4, 3, 68, 24, 4, 0x10A2);
-    tft.drawRoundRect(4, 3, 68, 24, 4, COLOR_ACCENT_CYAN);
-    font_draw_string(8, 7, "< 返回", COLOR_ACCENT_CYAN, 0x10A2, 1);
+    tft.fillRoundRect(6, 4, 58, 22, 4, UI_COL_SURFACE_HIGH);
+    tft.drawRoundRect(6, 4, 58, 22, 4, UI_COL_BORDER_LIGHT);
+    font_draw_string(14, 7, "< 返回", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH, 1);
   }
 
   // 标题文字 (支持中文点阵渲染)
-  font_draw_string(showBackBtn ? 78 : 10, 7, title, COLOR_TEXT_PRIMARY, COLOR_BG_DARK, 1);
+  font_draw_string(showBackBtn ? 72 : 12, 7, title, UI_COL_TEXT_PRIMARY, UI_COL_BG, 1);
 
   // 电池电量数值与小图标 (右侧)
   char bBuf[24];
-  snprintf(bBuf, sizeof(bBuf), "%d%% %.2fV", battery_get_percent(), battery_get_voltage());
-  tft.setTextColor(battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN, COLOR_BG_DARK);
-  tft.drawString(bBuf, 194, 8, 1);
+  uint8_t pct = battery_get_percent();
+  float v = battery_get_voltage();
+  bool usb = battery_is_usb_powered();
+  snprintf(bBuf, sizeof(bBuf), "%d%% %.2fV", pct, v);
+  tft.setTextColor(battery_is_low() ? UI_COL_RED : (usb ? UI_COL_AMBER : UI_COL_TEXT_MUTED), UI_COL_BG);
+  tft.drawString(bBuf, 186, 9, 1);
 
-  int bx = 276, by = 8, bw = 30, bh = 14;
-  tft.drawRect(bx, by, bw, bh, COLOR_TEXT_PRIMARY);
-  tft.fillRect(bx + bw, by + 4, 3, 6, COLOR_TEXT_PRIMARY);
-  int fillW = map(battery_get_percent(), 0, 100, 0, bw - 4);
+  int bx = 278, by = 8, bw = 30, bh = 14;
+  tft.drawRoundRect(bx, by, bw, bh, 3, UI_COL_BORDER_LIGHT);
+  tft.fillRect(bx + bw, by + 4, 2, 6, UI_COL_BORDER_LIGHT);
+  int fillW = map(pct, 0, 100, 0, bw - 4);
   fillW = constrain(fillW, 0, bw - 4);
-  uint16_t bCol = battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN;
+  uint16_t bCol = battery_is_low() ? UI_COL_RED : (usb ? UI_COL_AMBER : UI_COL_GREEN);
   tft.fillRect(bx + 2, by + 2, fillW, bh - 4, bCol);
-  tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, COLOR_BG_DARK);
+  tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, UI_COL_BG);
 }
 
 void ui_init() {
@@ -71,24 +75,20 @@ void ui_init() {
   novel_init();
 
   TFT_eSPI& tft = display_get_tft();
-  tft.fillScreen(COLOR_BG_DARK);
+  tft.fillScreen(UI_COL_BG);
 
   // 显示用户头像 (汪汪)
   tft.setSwapBytes(true);
   tft.pushImage(110, 15, dog_image_width, dog_image_height, dog_image_data);
 
-  // 开机引导 / 开发者介绍
-  font_draw_string_center(160, 125, "欢迎使用 摆烂播放器", COLOR_TEXT_PRIMARY, COLOR_BG_DARK, 1);
-  font_draw_string_center(160, 155, "开发者: 摆烂233", COLOR_ACCENT_ORANGE, COLOR_BG_DARK, 1);
-  font_draw_string_center(160, 185, "邮箱: lb1493729@gmail.com", COLOR_ACCENT_GREEN, COLOR_BG_DARK, 1);
+  // 开机引导 / 开发者介绍 (极简工业排版)
+  font_draw_string_center(160, 125, "摆烂播放器 · CYD-DAP", UI_COL_TEXT_PRIMARY, UI_COL_BG, 1);
+  font_draw_string_center(160, 155, "开发者: 摆烂233", UI_COL_AMBER, UI_COL_BG, 1);
+  font_draw_string_center(160, 185, "邮箱: lb1493729@gmail.com", UI_COL_TEXT_MUTED, UI_COL_BG, 1);
   
-  font_draw_string_center(160, 220, "- 点击屏幕继续 -", COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
+  font_draw_string_center(160, 220, "- 轻触屏幕继续 -", UI_COL_TEXT_DIM, UI_COL_BG, 1);
 
   // 等待触摸
-  // 注意 1：这个循环会阻塞主循环，因此在这里补做"后台家务"——
-  //         否则大容量卡在软复位后卡死时，用户重新插拔卡片也永远等不到重试机会。
-  // 注意 2：必须同时轮询实体按键。若触摸校准损坏导致点哪里都不对，用户连这一屏
-  //         都过不去，长按 BOOT 进校准就成了唯一的自救通道。
   bool touched = false;
   bool goCalibration = false;
   int16_t tx, ty;
@@ -206,8 +206,6 @@ UIPage ui_get_previous_page() {
 
 void ui_update() {
   // 息屏时跳过页面重绘：背光已关闭，重绘纯属浪费 CPU 与 SPI 带宽。
-  // 注意：校准页必须例外——它的触摸采样与 BOOT 键跳过逻辑都在 update 里，
-  // 一旦被跳过就再也无法唤醒，屏幕会永久黑屏。
   if (display_is_sleeping() && s_currentPage != UI_PAGE_TOUCH_CAL) return;
 
   switch (s_currentPage) {
@@ -264,19 +262,21 @@ void ui_update() {
       break;
   }
 
-  // 每 2 秒微刷新一次通用头部电量指示 (仅在采用通用头部的页面刷新，防干扰锁屏大时钟与无头界面)
+  // 每 2 秒微刷新一次通用头部电量指示
   if (millis() - s_lastHeaderRefresh >= 2000) {
     s_lastHeaderRefresh = millis();
     if (s_currentPage != UI_PAGE_LOCKSCREEN && 
         s_currentPage != UI_PAGE_SPLASH && 
         s_currentPage != UI_PAGE_TOUCH_CAL) {
-      int bx = 276, by = 8, bw = 30, bh = 14;
+      int bx = 278, by = 8, bw = 30, bh = 14;
       TFT_eSPI& tft = display_get_tft();
-      int fillW = map(battery_get_percent(), 0, 100, 0, bw - 4);
+      uint8_t pct = battery_get_percent();
+      bool usb = battery_is_usb_powered();
+      int fillW = map(pct, 0, 100, 0, bw - 4);
       fillW = constrain(fillW, 0, bw - 4);
-      uint16_t bCol = battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN;
+      uint16_t bCol = battery_is_low() ? UI_COL_RED : (usb ? UI_COL_AMBER : UI_COL_GREEN);
       tft.fillRect(bx + 2, by + 2, fillW, bh - 4, bCol);
-      tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, COLOR_BG_DARK);
+      tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, UI_COL_BG);
     }
   }
 }
@@ -393,16 +393,12 @@ void ui_handle_button_click() {
     audio_test_beep(1000, 40);
     ui_switch_to(s_previousPage != UI_PAGE_SPLASH ? s_previousPage : UI_PAGE_SETTINGS);
   } else {
-    // 在子页面短按 BOOT 键直接作为物理【返回】键！
     LOG_UI("物理按键触发返回主页");
     ui_switch_to(UI_PAGE_LOCKSCREEN);
   }
 }
 
 void ui_handle_button_long_press() {
-  // 长按 BOOT 键 -> 进入触屏校准
-  // 这是触摸失灵时唯一的"物理救命通道"：校准数据损坏会导致所有按钮错位，
-  // 此时用户无法通过触摸进入设置页，必须留一条不依赖触摸的入口。
   LOG_UI("实体按键 BOOT 长按 -> 进入触屏校准");
   audio_test_beep(1000, 80);
   ui_switch_to(UI_PAGE_TOUCH_CAL);

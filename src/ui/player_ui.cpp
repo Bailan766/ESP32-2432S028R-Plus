@@ -1,6 +1,7 @@
 #include "hardware/rgb.h"
 #include "player_ui.h"
 #include "ui.h"
+#include "ui_theme.h"
 #include "font_cn.h"
 #include "hardware/display.h"
 #include "hardware/audio.h"
@@ -8,76 +9,78 @@
 
 #define SPEC_BARS 16
 static int s_specH[SPEC_BARS] = {0};
+static int s_peakH[SPEC_BARS] = {0};
+static unsigned long s_lastPeakDecay[SPEC_BARS] = {0};
 static unsigned long s_lastSpecTime = 0;
 static unsigned long s_lastProgressTime = 0;
 
 static void renderStaticElements() {
   TFT_eSPI& tft = display_get_tft();
-  tft.fillScreen(COLOR_BG_DARK);
+  tft.fillScreen(UI_COL_BG);
 
   ui_draw_header("正在播放", true);
 
-  // 1. 曲目信息卡片 (y: 34 ~ 80)
-  tft.fillRoundRect(10, 34, 300, 46, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(10, 34, 300, 46, 6, COLOR_PANEL_BORDER);
-  
-  // 息屏按钮
+  // 1. 曲目信息卡片 (y: 34 ~ 80, h = 46)
+  int16_t cardX = 10, cardY = 34, cardW = 300, cardH = 46;
+  tft.fillRoundRect(cardX, cardY, cardW, cardH, 6, UI_COL_SURFACE);
+  tft.drawRoundRect(cardX, cardY, cardW, cardH, 6, UI_COL_BORDER_SUBTLE);
 
   const TrackInfo* t = player_get_current_track();
-  font_draw_string(20, 40, t ? t->title : "未选择曲目", COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
-
-  char sub[48];
-  snprintf(sub, sizeof(sub), "艺术家: %s | %s",
-           t ? t->artist : "---",
-           player_state_to_string(player_get_state()));
-  font_draw_string(20, 60, sub, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
-
-  // 2. 控制按键第一排 (y: 156 ~ 200)
-  // PREV (|<)
-  tft.fillRoundRect(10, 156, 58, 42, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(10, 156, 58, 42, 6, COLOR_PANEL_BORDER);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(COLOR_ACCENT_CYAN);
-  tft.drawString("|<", 39, 177, 4);
-
-  // PLAY / PAUSE (主按键)
   bool playing = (player_get_state() == STATE_PLAYING);
-  tft.fillRoundRect(76, 152, 80, 48, 8, playing ? COLOR_ACCENT_ORANGE : COLOR_ACCENT_GREEN);
-  tft.drawRoundRect(76, 152, 80, 48, 8, COLOR_TEXT_PRIMARY);
-  font_draw_string_center(116, 168, playing ? "暂停" : "播放", TFT_BLACK, playing ? COLOR_ACCENT_ORANGE : COLOR_ACCENT_GREEN, 1);
 
-  // NEXT (>|)
-  tft.fillRoundRect(164, 156, 58, 42, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(164, 156, 58, 42, 6, COLOR_PANEL_BORDER);
-  tft.setTextColor(COLOR_ACCENT_CYAN);
-  tft.drawString(">|", 193, 177, 4);
+  // 左侧指示条
+  tft.fillRect(cardX + 2, cardY + 8, 3, cardH - 16, playing ? UI_COL_AMBER : UI_COL_BORDER_LIGHT);
 
-  // MODE (循环模式)
-  tft.fillRoundRect(230, 156, 80, 42, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(230, 156, 80, 42, 6, COLOR_PANEL_BORDER);
+  // 曲目标题
+  const char* songTitle = t && strlen(t->title) > 0 ? t->title : "未选择曲目";
+  font_draw_string(cardX + 16, cardY + 6, songTitle, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+
+  // 格式与艺术家
+  char sub[64];
+  snprintf(sub, sizeof(sub), "MP3 44.1kHz DAC2 | %s",
+           (t && strlen(t->artist) > 0) ? t->artist : "本地音频");
+  font_draw_string(cardX + 16, cardY + 26, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+
+  // 2. 第一排主控按键 (y: 154 ~ 198, h = 44)
+  // 上一曲 |< (x: 10, w: 56)
+  tft.fillRoundRect(10, 154, 56, 44, 6, UI_COL_SURFACE_HIGH);
+  tft.drawRoundRect(10, 154, 56, 44, 6, UI_COL_BORDER_LIGHT);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(UI_COL_TEXT_PRIMARY);
+  tft.drawString("|<", 38, 176, 4);
+
+  // 播放 / 暂停 (Hero 按键: x: 74, w: 84)
+  tft.fillRoundRect(74, 152, 84, 48, 6, UI_COL_AMBER);
+  tft.drawRoundRect(74, 152, 84, 48, 6, UI_COL_TEXT_PRIMARY);
+  font_draw_string_center(116, 168, playing ? "暂停" : "播放", TFT_BLACK, UI_COL_AMBER, 1);
+
+  // 下一曲 >| (x: 166, w: 56)
+  tft.fillRoundRect(166, 154, 56, 44, 6, UI_COL_SURFACE_HIGH);
+  tft.drawRoundRect(166, 154, 56, 44, 6, UI_COL_BORDER_LIGHT);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(UI_COL_TEXT_PRIMARY);
+  tft.drawString(">|", 194, 176, 4);
+
+  // 循环模式切换 (x: 230, w: 80)
+  tft.fillRoundRect(230, 154, 80, 44, 6, UI_COL_SURFACE);
+  tft.drawRoundRect(230, 154, 80, 44, 6, UI_COL_BORDER_LIGHT);
   const char* mStr = "全部循环";
   if (player_get_mode() == MODE_REPEAT_ONE) mStr = "单曲循环";
   else if (player_get_mode() == MODE_SHUFFLE) mStr = "随机播放";
   else if (player_get_mode() == MODE_SEQUENTIAL) mStr = "顺序播放";
-  font_draw_string_center(270, 169, mStr, COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 1);
+  font_draw_string_center(270, 168, mStr, UI_COL_AMBER, UI_COL_SURFACE, 1);
 
-  // 3. 控制按键第二排 (快退, 音量, 快进)
-  // -5s 快退
-  tft.fillRoundRect(10, 206, 68, 28, 4, 0x10A2);
-  tft.drawRoundRect(10, 206, 68, 28, 4, COLOR_PANEL_BORDER);
-  font_draw_string_center(44, 212, "快退 -5s", COLOR_TEXT_PRIMARY, 0x10A2, 1);
+  // 3. 第二排辅助控制按键 (y: 204 ~ 236, h = 32)
+  // -5s 快退 (x: 10, w: 68)
+  ui_theme_draw_pill_btn(10, 204, 68, 32, "快退 -5s", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
-  // VOL 音量
-  tft.fillRoundRect(86, 206, 136, 28, 4, 0x10A2);
-  tft.drawRoundRect(86, 206, 136, 28, 4, COLOR_PANEL_BORDER);
+  // VOL 音量 (x: 86, w: 136)
   char volBuf[32];
   snprintf(volBuf, sizeof(volBuf), "音量: %d%%", audio_get_volume());
-  font_draw_string_center(154, 212, volBuf, COLOR_ACCENT_CYAN, 0x10A2, 1);
+  ui_theme_draw_pill_btn(86, 204, 136, 32, volBuf, UI_COL_CYAN, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
-  // +5s 快进
-  tft.fillRoundRect(230, 206, 80, 28, 4, 0x10A2);
-  tft.drawRoundRect(230, 206, 80, 28, 4, COLOR_PANEL_BORDER);
-  font_draw_string_center(270, 212, "快进 +5s", COLOR_TEXT_PRIMARY, 0x10A2, 1);
+  // +5s 快进 (x: 230, w: 80)
+  ui_theme_draw_pill_btn(230, 204, 80, 32, "快进 +5s", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   tft.setTextDatum(TL_DATUM);
 }
@@ -89,33 +92,41 @@ static void updateProgressBar() {
   uint16_t total = player_get_total_seconds();
   if (total == 0) total = 180;
 
-  // 时间显示
+  // 时间显示 (y: 132 ~ 146)
   char timeBuf[16];
   snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", elapsed / 60, elapsed % 60);
-  tft.fillRect(10, 134, 45, 14, COLOR_BG_DARK);
-  tft.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
-  tft.drawString(timeBuf, 10, 134, 2);
+  tft.fillRect(10, 132, 45, 14, UI_COL_BG);
+  tft.setTextColor(UI_COL_TEXT_MUTED, UI_COL_BG);
+  tft.drawString(timeBuf, 10, 132, 2);
 
   snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", total / 60, total % 60);
-  tft.fillRect(265, 134, 45, 14, COLOR_BG_DARK);
-  tft.drawString(timeBuf, 270, 134, 2);
+  tft.fillRect(265, 132, 45, 14, UI_COL_BG);
+  tft.setTextColor(UI_COL_TEXT_MUTED, UI_COL_BG);
+  tft.drawString(timeBuf, 270, 132, 2);
 
   // 进度条主体 (x: 58 ~ 260, 宽 202)
-  int barX = 58, barY = 140, barW = 202, barH = 4;
+  int barX = 58, barY = 138, barW = 202, barH = 4;
   int prog = (int)((long)elapsed * barW / total);
   prog = constrain(prog, 0, barW);
 
-  tft.fillRect(barX, barY, prog, barH, COLOR_ACCENT_CYAN);
-  tft.fillRect(barX + prog, barY, barW - prog, barH, 0x3186);
-  tft.fillCircle(barX + prog, barY + 2, 4, COLOR_TEXT_PRIMARY);
+  // 凹槽底轨
+  tft.fillRoundRect(barX, barY, barW, barH, 2, UI_COL_BORDER_SUBTLE);
+  // 已播放进度高亮
+  if (prog > 0) {
+    tft.fillRoundRect(barX, barY, prog, barH, 2, UI_COL_AMBER);
+  }
+  // 滑动圆点指示
+  tft.fillCircle(barX + prog, barY + 2, 4, UI_COL_TEXT_PRIMARY);
+  tft.drawCircle(barX + prog, barY + 2, 5, UI_COL_AMBER);
 }
 
+// 复古 Hi-Fi LED 分段频谱分析仪 (带 Peak-Hold 峰值保持衰减)
 static void updateVisualizer() {
-  if (millis() - s_lastSpecTime < 40) return; // ~25 FPS
+  if (millis() - s_lastSpecTime < 40) return; // ~25 FPS 顺滑刷新
   s_lastSpecTime = millis();
 
   TFT_eSPI& tft = display_get_tft();
-  int startX = 14, startY = 128, maxH = 42, barW = 14, gap = 4;
+  int startX = 14, startY = 126, maxH = 40, barW = 14, gap = 4;
   uint16_t freq = player_get_current_note_freq();
   bool playing = (player_get_state() == STATE_PLAYING);
 
@@ -124,26 +135,48 @@ static void updateVisualizer() {
     if (playing && freq > 0) {
       int center = (freq / 65) % SPEC_BARS;
       int dist = abs(i - center);
-      int pulse = random(max(4, maxH - dist * 7), maxH);
+      int pulse = random(max(4, maxH - dist * 6), maxH);
       targetH = constrain(pulse, 2, maxH);
     }
 
     if (s_specH[i] < targetH) {
       s_specH[i] = targetH;
     } else {
-      s_specH[i] = max(0, s_specH[i] - 4);
+      s_specH[i] = max(0, s_specH[i] - 3);
+    }
+
+    // 峰值保持与缓慢衰减算法
+    if (s_specH[i] >= s_peakH[i]) {
+      s_peakH[i] = s_specH[i];
+      s_lastPeakDecay[i] = millis();
+    } else if (millis() - s_lastPeakDecay[i] > 200) {
+      if (s_peakH[i] > 0) s_peakH[i]--;
     }
 
     int h = s_specH[i];
     int bx = startX + i * (barW + gap);
-    int by = startY - h;
 
+    // 清除顶部未点亮区域
     if (maxH - h > 0) {
-      tft.fillRect(bx, startY - maxH, barW, maxH - h, COLOR_BG_DARK);
+      tft.fillRect(bx, startY - maxH, barW, maxH - h, UI_COL_BG);
     }
-    if (h > 0) {
-      uint16_t col = (h > 30) ? TFT_RED : ((h > 16) ? TFT_YELLOW : COLOR_ACCENT_GREEN);
-      tft.fillRect(bx, by, barW, h, col);
+
+    // 绘制 LED 分段块 (每块高 3px, 间隔 1px)
+    int segH = 3, segGap = 1;
+    int numSegs = h / (segH + segGap);
+    for (int s = 0; s < numSegs; s++) {
+      int segY = startY - (s + 1) * (segH + segGap);
+      uint16_t segCol;
+      if (s < 5) segCol = UI_COL_GREEN;
+      else if (s < 8) segCol = UI_COL_AMBER;
+      else segCol = UI_COL_RED;
+      tft.fillRect(bx, segY, barW, segH, segCol);
+    }
+
+    // 绘制 Peak-Hold 悬浮单段微高亮
+    if (s_peakH[i] > 2) {
+      int peakY = startY - s_peakH[i];
+      tft.drawFastHLine(bx, peakY, barW, UI_COL_TEXT_PRIMARY);
     }
   }
 
@@ -178,8 +211,8 @@ void player_ui_handle_touch(int16_t x, int16_t y) {
     return;
   }
 
-  // 2. 进度条点击 Seeking (y: 130~150, x: 50~270)
-  if (y >= 130 && y <= 150 && x >= 50 && x <= 270) {
+  // 2. 进度条点击 Seeking (y: 125~150, x: 50~270)
+  if (y >= 125 && y <= 150 && x >= 50 && x <= 270) {
     uint16_t total = player_get_total_seconds();
     if (total > 0) {
       int clickOffset = constrain(x - 58, 0, 202);

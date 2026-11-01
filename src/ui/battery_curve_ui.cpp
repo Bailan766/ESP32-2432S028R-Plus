@@ -1,5 +1,6 @@
 #include "battery_curve_ui.h"
 #include "ui.h"
+#include "ui_theme.h"
 #include "font_cn.h"
 #include "hardware/display.h"
 #include "hardware/battery.h"
@@ -29,25 +30,23 @@ static int16_t calcY(const BatteryPoint& p) {
 }
 
 static uint16_t getPointColor(const BatteryPoint& p) {
-  if (p.isUsb) return COLOR_ACCENT_CYAN;
-  if (p.percent >= 50) return COLOR_ACCENT_GREEN;
-  if (p.percent >= 20) return COLOR_ACCENT_ORANGE;
-  return TFT_RED;
+  if (p.isUsb) return UI_COL_CYAN;
+  if (p.percent >= 25) return UI_COL_AMBER;
+  return UI_COL_RED;
 }
 
 static uint16_t getAreaFillColor(const BatteryPoint& p) {
-  if (p.isUsb) return 0x0110;
-  if (p.percent >= 50) return 0x01A0;
-  if (p.percent >= 20) return 0x2100;
-  return 0x2000;
+  if (p.isUsb) return 0x0188;
+  if (p.percent >= 25) return 0x3940;
+  return 0x2800;
 }
 
 static void renderDashboard() {
   TFT_eSPI& tft = display_get_tft();
 
   // 顶部信息面板 (y: 33 ~ 71, h = 38)
-  tft.fillRoundRect(8, 33, 304, 38, 5, COLOR_PANEL_BG);
-  tft.drawRoundRect(8, 33, 304, 38, 5, COLOR_PANEL_BORDER);
+  tft.fillRoundRect(8, 33, 304, 38, 5, UI_COL_SURFACE);
+  tft.drawRoundRect(8, 33, 304, 38, 5, UI_COL_BORDER_SUBTLE);
 
   float v = battery_get_voltage();
   uint8_t pct = battery_get_percent();
@@ -58,12 +57,12 @@ static void renderDashboard() {
   // 第一行: 电压与电量 + 充放电状态
   char line1[48];
   snprintf(line1, sizeof(line1), "当前: %.2fV  %d%%", v, pct);
-  font_draw_string(16, 37, line1, usb ? COLOR_ACCENT_CYAN : COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 1);
+  font_draw_string(16, 37, line1, usb ? UI_COL_CYAN : UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
 
   if (usb) {
-    font_draw_string(180, 37, "[ 供电/充电中 ]", COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+    font_draw_string(180, 37, "[ 供电/充电中 ]", UI_COL_CYAN, UI_COL_SURFACE, 1);
   } else {
-    font_draw_string(180, 37, "[ 电池放电中 ]", COLOR_ACCENT_ORANGE, COLOR_PANEL_BG, 1);
+    font_draw_string(180, 37, "[ 电池放电中 ]", UI_COL_AMBER, UI_COL_SURFACE, 1);
   }
 
   // 第二行: 预估续航与放电速率
@@ -73,22 +72,22 @@ static void renderDashboard() {
   } else {
     snprintf(line2, sizeof(line2), "预估续航:约%.1f小时 | 速率:%.1f%%/h", remainingHours, rate);
   }
-  font_draw_string(16, 53, line2, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  font_draw_string(16, 53, line2, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 }
 
 static void renderChart() {
   TFT_eSPI& tft = display_get_tft();
 
   // 图表背景与边框
-  tft.fillRect(CHART_X, CHART_Y, CHART_W, CHART_H, 0x0842);
-  tft.drawRect(CHART_X, CHART_Y, CHART_W, CHART_H, COLOR_PANEL_BORDER);
+  tft.fillRect(CHART_X, CHART_Y, CHART_W, CHART_H, UI_COL_SURFACE);
+  tft.drawRect(CHART_X, CHART_Y, CHART_W, CHART_H, UI_COL_BORDER_SUBTLE);
 
   // 清除 Y 轴刻度文字区 (x: 0 ~ 35, y: 72 ~ 190)
-  tft.fillRect(0, 72, 35, 118, COLOR_BG_DARK);
+  tft.fillRect(0, 72, 35, 118, UI_COL_BG);
 
   // 绘制 Y 轴刻度标签与水平网格虚线
   tft.setTextSize(1);
-  tft.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
+  tft.setTextColor(UI_COL_TEXT_MUTED, UI_COL_BG);
 
   if (s_modeVoltage) {
     tft.drawString("4.2V", 4, CHART_Y + 2);
@@ -106,40 +105,37 @@ static void renderChart() {
   int yMid1 = CHART_Y + CHART_H / 3;
   int yMid2 = CHART_Y + (CHART_H * 2) / 3;
   for (int x = CHART_X + 2; x < CHART_X + CHART_W - 2; x += 6) {
-    tft.drawPixel(x, yMid1, 0x2126);
-    tft.drawPixel(x, yMid2, 0x2126);
+    tft.drawPixel(x, yMid1, UI_COL_BORDER_SUBTLE);
+    tft.drawPixel(x, yMid2, UI_COL_BORDER_SUBTLE);
   }
 
   // 垂直网格线 (对应 -40m, -20m)
   int xT1 = CHART_X + CHART_W / 3;
   int xT2 = CHART_X + (CHART_W * 2) / 3;
   for (int y = CHART_Y + 2; y < CHART_Y + CHART_H - 2; y += 6) {
-    tft.drawPixel(xT1, y, 0x2126);
-    tft.drawPixel(xT2, y, 0x2126);
+    tft.drawPixel(xT1, y, UI_COL_BORDER_SUBTLE);
+    tft.drawPixel(xT2, y, UI_COL_BORDER_SUBTLE);
   }
 
   // X 轴时间刻度标签 (y: 190 ~ 200)
-  tft.fillRect(CHART_X, 190, CHART_W, 12, COLOR_BG_DARK);
+  tft.fillRect(CHART_X, 190, CHART_W, 12, UI_COL_BG);
   tft.drawString("-60m", CHART_X, 191);
   tft.drawString("-40m", xT1 - 10, 191);
   tft.drawString("-20m", xT2 - 10, 191);
-  font_draw_string(CHART_X + CHART_W - 24, 190, "现在", COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
+  font_draw_string(CHART_X + CHART_W - 24, 190, "现在", UI_COL_TEXT_MUTED, UI_COL_BG, 1);
 
   // 绘制数据折线与阴影填充
   uint16_t count = battery_history_get_count();
   const BatteryPoint* pts = battery_history_get_points();
   if (count == 0 || pts == nullptr) return;
 
-  // 将数据点映射到 X 坐标 (右对齐，最新点在 CHART_X + CHART_W - 2)
   int16_t prevX = -1;
   int16_t prevY = -1;
-  int16_t rightX = CHART_X + CHART_W - 2;
   float dx = (float)(CHART_W - 4) / (float)(BATTERY_HISTORY_MAX - 1);
 
   for (uint16_t i = 0; i < count; i++) {
     int16_t x;
     if (count < BATTERY_HISTORY_MAX) {
-      // 历史点未满时，按已有点分布延伸，让用户直观看到走势
       x = CHART_X + 2 + (int16_t)(i * (CHART_W - 4) / (count > 1 ? (count - 1) : 1));
     } else {
       x = CHART_X + 2 + (int16_t)(i * dx);
@@ -156,20 +152,19 @@ static void renderChart() {
       // 折线 (主线)
       uint16_t lineCol = getPointColor(pts[i]);
       tft.drawLine(prevX, prevY, x, y, lineCol);
-      tft.drawLine(prevX, prevY + 1, x, y + 1, lineCol); // 双线宽度增加醒目度
+      tft.drawLine(prevX, prevY + 1, x, y + 1, lineCol);
     }
 
     prevX = x;
     prevY = y;
   }
 
-  // 在最新数据点上绘制高亮指示圆点
+  // 最新数据点圆点
   if (count > 0 && prevX >= 0 && prevY >= 0) {
     uint16_t dotCol = getPointColor(pts[count - 1]);
-    tft.fillCircle(prevX, prevY, 3, TFT_WHITE);
+    tft.fillCircle(prevX, prevY, 3, UI_COL_TEXT_PRIMARY);
     tft.drawCircle(prevX, prevY, 4, dotCol);
 
-    // 在最新点旁边标注当前数值
     char curValStr[16];
     if (s_modeVoltage) {
       snprintf(curValStr, sizeof(curValStr), "%.2fV", pts[count - 1].mv / 1000.0f);
@@ -180,35 +175,27 @@ static void renderChart() {
     int textY = prevY - 14;
     if (textX < CHART_X + 4) textX = prevX + 6;
     if (textY < CHART_Y + 4) textY = prevY + 6;
-    tft.setTextColor(TFT_WHITE, 0x0842);
+    tft.setTextColor(UI_COL_TEXT_PRIMARY, UI_COL_SURFACE);
     tft.drawString(curValStr, textX, textY);
   }
 }
 
 static void renderButtons() {
-  TFT_eSPI& tft = display_get_tft();
-
   // 底部按钮栏 (y: 204 ~ 236, h = 32)
   // 1. 切换模式按钮 (x: 10, w: 94)
-  tft.fillRoundRect(10, 204, 94, 32, 5, 0x10A2);
-  tft.drawRoundRect(10, 204, 94, 32, 5, COLOR_ACCENT_CYAN);
   const char* modeText = s_modeVoltage ? "模式: 电压V" : "模式: 百分比";
-  font_draw_string_center(57, 212, modeText, COLOR_ACCENT_CYAN, 0x10A2, 1);
+  ui_theme_draw_pill_btn(10, 204, 94, 32, modeText, UI_COL_CYAN, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   // 2. 重置曲线按钮 (x: 113, w: 94)
-  tft.fillRoundRect(113, 204, 94, 32, 5, 0x10A2);
-  tft.drawRoundRect(113, 204, 94, 32, 5, COLOR_ACCENT_ORANGE);
-  font_draw_string_center(160, 212, "重置曲线", COLOR_ACCENT_ORANGE, 0x10A2, 1);
+  ui_theme_draw_pill_btn(113, 204, 94, 32, "重置曲线", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   // 3. 硬件自检按钮 (x: 216, w: 94)
-  tft.fillRoundRect(216, 204, 94, 32, 5, 0x03E0);
-  tft.drawRoundRect(216, 204, 94, 32, 5, COLOR_TEXT_PRIMARY);
-  font_draw_string_center(263, 212, "硬件自检", TFT_WHITE, 0x03E0, 1);
+  ui_theme_draw_pill_btn(216, 204, 94, 32, "硬件自检", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 }
 
 void battery_curve_ui_enter() {
   TFT_eSPI& tft = display_get_tft();
-  tft.fillScreen(COLOR_BG_DARK);
+  tft.fillScreen(UI_COL_BG);
 
   ui_draw_header("电池耗电曲线", true);
   renderDashboard();
@@ -224,7 +211,6 @@ void battery_curve_ui_update() {
     s_lastUpdate = millis();
     renderDashboard();
 
-    // 如果数据点有新增，重绘曲线图
     uint16_t curCount = battery_history_get_count();
     if (curCount != s_lastHistoryCount) {
       s_lastHistoryCount = curCount;
@@ -234,7 +220,7 @@ void battery_curve_ui_update() {
 }
 
 void battery_curve_ui_handle_touch(int16_t x, int16_t y) {
-  // 1. 顶部返回按钮 (x: 0 ~ 76, y: 0 ~ 32)
+  // 1. 顶部返回按钮
   if (x <= 76 && y <= 32) {
     audio_test_beep(1000, 30);
     UIPage prev = ui_get_previous_page();
@@ -248,7 +234,6 @@ void battery_curve_ui_handle_touch(int16_t x, int16_t y) {
 
   // 2. 底部功能按钮 (y: 202 ~ 238)
   if (y >= 202 && y <= 238) {
-    // 切换模式 (x: 10 ~ 104)
     if (x >= 10 && x <= 104) {
       s_modeVoltage = !s_modeVoltage;
       audio_test_beep(1400, 30);
@@ -257,7 +242,6 @@ void battery_curve_ui_handle_touch(int16_t x, int16_t y) {
       return;
     }
 
-    // 重置曲线 (x: 113 ~ 207)
     if (x >= 113 && x <= 207) {
       battery_history_clear();
       s_lastHistoryCount = battery_history_get_count();
@@ -267,7 +251,6 @@ void battery_curve_ui_handle_touch(int16_t x, int16_t y) {
       return;
     }
 
-    // 硬件自检 (x: 216 ~ 310)
     if (x >= 216 && x <= 310) {
       audio_test_beep(1000, 40);
       ui_switch_to(UI_PAGE_HARDWARE_TEST);

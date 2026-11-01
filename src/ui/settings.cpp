@@ -1,6 +1,7 @@
 #include "reader/novel.h"
 #include "settings.h"
 #include "ui.h"
+#include "ui_theme.h"
 #include "font_cn.h"
 #include "hardware/display.h"
 #include "hardware/audio.h"
@@ -16,80 +17,82 @@ static void renderAboutModal() {
   TFT_eSPI& tft = display_get_tft();
 
   // 半透明深色遮罩与对话框卡片
-  tft.fillRoundRect(16, 28, 288, 196, 8, 0x08A3);
-  tft.drawRoundRect(16, 28, 288, 196, 8, COLOR_ACCENT_CYAN);
+  tft.fillRoundRect(16, 28, 288, 196, 6, UI_COL_SURFACE);
+  tft.drawRoundRect(16, 28, 288, 196, 6, UI_COL_BORDER_LIGHT);
 
-  font_draw_string_center(160, 36, "关于本机 (CYD Plus)", COLOR_ACCENT_CYAN, 0x08A3, 1);
-  tft.drawLine(24, 54, 296, 54, COLOR_PANEL_BORDER);
+  font_draw_string_center(160, 36, "关于本机 · CYD-DAP", UI_COL_AMBER, UI_COL_SURFACE, 1);
+  tft.drawLine(24, 54, 296, 54, UI_COL_BORDER_SUBTLE);
 
-  font_draw_string(26, 60, "开发者: " PROJECT_AUTHOR, COLOR_ACCENT_ORANGE, 0x08A3, 1);
+  font_draw_string(26, 60, "开发者: " PROJECT_AUTHOR, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
 
   char verBuf[48];
   snprintf(verBuf, sizeof(verBuf), "固件: 摆烂播放器 %s %s", PROJECT_VERSION, PROJECT_EDITION);
-  font_draw_string(26, 82, verBuf, COLOR_ACCENT_GREEN, 0x08A3, 1);
+  font_draw_string(26, 82, verBuf, UI_COL_AMBER, UI_COL_SURFACE, 1);
 
-  font_draw_string(26, 104, "硬件: ESP32-D0WD-V3 (双核 240MHz)", COLOR_TEXT_PRIMARY, 0x08A3, 1);
-  font_draw_string(26, 126, "屏幕: ST7789 2.8寸 (320x240)", COLOR_TEXT_PRIMARY, 0x08A3, 1);
-  font_draw_string(26, 148, "触控: XPT2046 软件SPI仿射校准", COLOR_TEXT_PRIMARY, 0x08A3, 1);
+  font_draw_string(26, 104, "硬件: ESP32-D0WD-V3 (双核 240MHz)", UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  font_draw_string(26, 126, "屏幕: ST7789 2.8寸 (320x240)", UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  font_draw_string(26, 148, "触控: XPT2046 独立SPI仿射校准", UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 
   char heapBuf[48];
   snprintf(heapBuf, sizeof(heapBuf), "空闲内存: %u KB (运行正常)", ESP.getFreeHeap() / 1024);
-  font_draw_string(26, 170, heapBuf, COLOR_TEXT_MUTED, 0x08A3, 1);
+  font_draw_string(26, 170, heapBuf, UI_COL_TEXT_DIM, UI_COL_SURFACE, 1);
 
-  tft.fillRoundRect(70, 192, 180, 26, 4, 0x10A2);
-  tft.drawRoundRect(70, 192, 180, 26, 4, COLOR_ACCENT_CYAN);
-  font_draw_string_center(160, 197, "[点击任意位置返回设置]", COLOR_ACCENT_CYAN, 0x10A2, 1);
+  tft.fillRoundRect(70, 192, 180, 26, 4, UI_COL_SURFACE_HIGH);
+  tft.drawRoundRect(70, 192, 180, 26, 4, UI_COL_BORDER_LIGHT);
+  font_draw_string_center(160, 197, "[点击任意位置返回]", UI_COL_AMBER, UI_COL_SURFACE_HIGH, 1);
 }
 
 static void render_slider(int y, int val, const char* valStr, uint16_t color) {
   TFT_eSPI& tft = display_get_tft();
-  int cx = 70 + (val * 190 / 100);
+  int trackX = 72, trackW = 188;
+  int cx = trackX + (val * trackW / 100);
   
-  // Clear track and handle area
-  tft.fillRect(64, y + 8, 202, 16, COLOR_PANEL_BG);
+  // 清除区域
+  tft.fillRect(68, y + 8, 196, 16, UI_COL_SURFACE);
   
-  // Track
-  tft.fillRoundRect(70, y + 13, 190, 6, 3, 0x10A2);
-  // Fill
+  // 轨道凹槽
+  tft.fillRoundRect(trackX, y + 14, trackW, 4, 2, UI_COL_BORDER_SUBTLE);
+  // 已填充段
   if (val > 0) {
-    tft.fillRoundRect(70, y + 13, val * 190 / 100, 6, 3, color);
+    tft.fillRoundRect(trackX, y + 14, val * trackW / 100, 4, 2, color);
   }
-  // Handle
-  tft.fillRoundRect(cx - 6, y + 8, 12, 16, 4, TFT_WHITE);
+  // 滑块药丸手柄
+  tft.fillCircle(cx, y + 16, 5, UI_COL_TEXT_PRIMARY);
+  tft.drawCircle(cx, y + 16, 6, color);
   
-  // Clear and draw text
-  tft.fillRect(265, y + 8, 45, 16, COLOR_PANEL_BG);
-  font_draw_string(270, y + 8, valStr, color, COLOR_PANEL_BG, 1);
+  // 数值文字
+  tft.fillRect(266, y + 8, 44, 16, UI_COL_SURFACE);
+  font_draw_string(270, y + 8, valStr, color, UI_COL_SURFACE, 1);
 }
 
 static void renderSettings() {
   TFT_eSPI& tft = display_get_tft();
-  tft.fillScreen(COLOR_BG_DARK);
+  tft.fillScreen(UI_COL_BG);
 
   ui_draw_header("系统设置", true);
 
   SystemSettings& cfg = settings_get();
 
   // 1. 音量 (y: 33 ~ 65)
-  tft.fillRoundRect(10, 33, 300, 32, 5, COLOR_PANEL_BG);
-  tft.drawRoundRect(10, 33, 300, 32, 5, COLOR_PANEL_BORDER);
-  font_draw_string(20, 41, "音量", COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
+  tft.fillRoundRect(10, 33, 300, 32, 5, UI_COL_SURFACE);
+  tft.drawRoundRect(10, 33, 300, 32, 5, UI_COL_BORDER_SUBTLE);
+  font_draw_string(20, 41, "音量", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
   char volBuf[16];
   snprintf(volBuf, sizeof(volBuf), "%d%%", cfg.volume);
-  render_slider(33, cfg.volume, volBuf, COLOR_ACCENT_CYAN);
+  render_slider(33, cfg.volume, volBuf, UI_COL_AMBER);
 
   // 2. 屏幕亮度 (y: 69 ~ 101)
-  tft.fillRoundRect(10, 69, 300, 32, 5, COLOR_PANEL_BG);
-  tft.drawRoundRect(10, 69, 300, 32, 5, COLOR_PANEL_BORDER);
-  font_draw_string(20, 77, "亮度", COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
+  tft.fillRoundRect(10, 69, 300, 32, 5, UI_COL_SURFACE);
+  tft.drawRoundRect(10, 69, 300, 32, 5, UI_COL_BORDER_SUBTLE);
+  font_draw_string(20, 77, "亮度", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
   char briBuf[16];
   snprintf(briBuf, sizeof(briBuf), "%d%%", cfg.brightness);
-  render_slider(69, cfg.brightness, briBuf, COLOR_ACCENT_GREEN);
+  render_slider(69, cfg.brightness, briBuf, UI_COL_CYAN);
 
   // 3. 自动息屏时间 (y: 105 ~ 137)
-  tft.fillRoundRect(10, 105, 300, 32, 5, COLOR_PANEL_BG);
-  tft.drawRoundRect(10, 105, 300, 32, 5, COLOR_PANEL_BORDER);
-  font_draw_string(20, 113, "自动息屏", COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
+  tft.fillRoundRect(10, 105, 300, 32, 5, UI_COL_SURFACE);
+  tft.drawRoundRect(10, 105, 300, 32, 5, UI_COL_BORDER_SUBTLE);
+  font_draw_string(20, 113, "电源管理", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
 
   const char* sleepStr = "关闭";
   if (cfg.autoSleepSeconds == 30) sleepStr = "30秒";
@@ -97,63 +100,41 @@ static void renderSettings() {
   else if (cfg.autoSleepSeconds == 180) sleepStr = "3分钟";
   else if (cfg.autoSleepSeconds == 300) sleepStr = "5分钟";
 
-  tft.fillRoundRect(85, 108, 55, 26, 4, 0x10A2);
-  tft.drawRoundRect(85, 108, 55, 26, 4, COLOR_PANEL_BORDER);
-  font_draw_string_center(112, 113, "锁屏", TFT_WHITE, 0x10A2, 1);
-
-  tft.fillRoundRect(145, 108, 55, 26, 4, 0x10A2);
-  tft.drawRoundRect(145, 108, 55, 26, 4, COLOR_PANEL_BORDER);
-  font_draw_string_center(172, 113, "息屏", TFT_WHITE, 0x10A2, 1);
-
-  tft.fillRoundRect(210, 108, 94, 26, 4, 0x10A2);
-  tft.drawRoundRect(210, 108, 94, 26, 4, COLOR_PANEL_BORDER);
-  font_draw_string_center(257, 113, sleepStr, COLOR_ACCENT_ORANGE, 0x10A2, 1);
+  ui_theme_draw_pill_btn(85, 108, 55, 26, "锁屏", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+  ui_theme_draw_pill_btn(145, 108, 55, 26, "息屏", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+  ui_theme_draw_pill_btn(210, 108, 94, 26, sleepStr, UI_COL_AMBER, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   // 4. 第一排功能按钮 (y: 141 ~ 177, h: 36, 3 个大按钮)
-  // 重扫TF卡 (Orange)
-  tft.fillRoundRect(10, 141, 94, 36, 5, 0x10A2);
-  tft.drawRoundRect(10, 141, 94, 36, 5, COLOR_ACCENT_ORANGE);
+  // 挂载/重扫TF卡
   const char* sdBtn = sdcard_is_available() ? "重扫TF卡" : "挂载TF卡";
-  font_draw_string_center(57, 151, sdBtn, COLOR_ACCENT_ORANGE, 0x10A2, 1);
+  ui_theme_draw_pill_btn(10, 141, 94, 36, sdBtn, UI_COL_AMBER, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
-  // 硬件自检 (Green)
-  tft.fillRoundRect(113, 141, 94, 36, 5, 0x03E0);
-  tft.drawRoundRect(113, 141, 94, 36, 5, COLOR_TEXT_PRIMARY);
-  font_draw_string_center(160, 151, "硬件自检", TFT_WHITE, 0x03E0, 1);
+  // 硬件自检
+  ui_theme_draw_pill_btn(113, 141, 94, 36, "硬件自检", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   // 断点续播
-  uint16_t resCol = cfg.resumeEnable ? COLOR_ACCENT_GREEN : COLOR_TEXT_MUTED;
-  uint16_t resBg = cfg.resumeEnable ? 0x0A42 : COLOR_PANEL_BG;
-  tft.fillRoundRect(216, 141, 94, 36, 5, resBg);
-  tft.drawRoundRect(216, 141, 94, 36, 5, cfg.resumeEnable ? COLOR_ACCENT_GREEN : COLOR_PANEL_BORDER);
-  font_draw_string_center(263, 151, cfg.resumeEnable ? "续播:开启" : "续播:关闭", resCol, resBg, 1);
+  const char* resTxt = cfg.resumeEnable ? "续播:开启" : "续播:关闭";
+  uint16_t resCol = cfg.resumeEnable ? UI_COL_GREEN : UI_COL_TEXT_MUTED;
+  ui_theme_draw_pill_btn(216, 141, 94, 36, resTxt, resCol, UI_COL_SURFACE_HIGH, cfg.resumeEnable ? UI_COL_BORDER_LIGHT : UI_COL_BORDER_SUBTLE);
 
-  // 5. 第二排功能按钮 (y: 181 ~ 217, h: 36, 4 个按钮)
+  // 5. 第二排功能按钮 (y: 181 ~ 217, h: 36, 4 个功能按钮)
   // 耗电曲线
-  tft.fillRoundRect(10, 181, 70, 36, 5, 0x10A2);
-  tft.drawRoundRect(10, 181, 70, 36, 5, COLOR_ACCENT_CYAN);
-  font_draw_string_center(45, 191, "耗电曲线", COLOR_ACCENT_CYAN, 0x10A2, 1);
+  ui_theme_draw_pill_btn(10, 181, 70, 36, "耗电曲线", UI_COL_AMBER, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   // 屏幕旋转
-  tft.fillRoundRect(85, 181, 70, 36, 5, 0x10A2);
-  tft.drawRoundRect(85, 181, 70, 36, 5, 0x92BB);
-  font_draw_string_center(120, 191, "屏幕旋转", COLOR_TEXT_PRIMARY, 0x10A2, 1);
+  ui_theme_draw_pill_btn(85, 181, 70, 36, "屏幕旋转", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   // 关于本机
-  tft.fillRoundRect(160, 181, 70, 36, 5, COLOR_PANEL_BG);
-  tft.drawRoundRect(160, 181, 70, 36, 5, 0x05E0);
-  font_draw_string_center(195, 191, "关于本机", 0x05E0, COLOR_PANEL_BG, 1);
+  ui_theme_draw_pill_btn(160, 181, 70, 36, "关于本机", UI_COL_CYAN, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   // 重启系统
-  tft.fillRoundRect(235, 181, 75, 36, 5, TFT_RED);
-  tft.drawRoundRect(235, 181, 75, 36, 5, COLOR_TEXT_PRIMARY);
-  font_draw_string_center(272, 191, "重启系统", TFT_WHITE, TFT_RED, 1);
+  ui_theme_draw_pill_btn(235, 181, 75, 36, "重启系统", UI_COL_RED, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
-  // 6. 底部关于信息
+  // 6. 底部版权与版本信息
   if (s_showAboutDialog) {
     renderAboutModal();
   } else {
-    font_draw_string_center(160, 224, "摆烂播放器 " PROJECT_VERSION " " PROJECT_EDITION " | CYD Plus", COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
+    font_draw_string_center(160, 224, "摆烂播放器 " PROJECT_VERSION " · CYD Plus Hi-Fi DAP", UI_COL_TEXT_DIM, UI_COL_BG, 1);
   }
 }
 
@@ -185,28 +166,28 @@ void settings_ui_handle_touch(int16_t x, int16_t y) {
 
   // 2. 音量调节行 (y: 33 ~ 65)
   if (y >= 33 && y <= 65) {
-    int newVol = (x - 70) * 100 / 190;
+    int newVol = (x - 72) * 100 / 188;
     newVol = constrain(newVol, 0, 100);
     cfg.volume = (uint8_t)newVol;
     audio_set_volume(cfg.volume);
     settings_save();
     char volBuf[16];
     snprintf(volBuf, sizeof(volBuf), "%d%%", cfg.volume);
-    render_slider(33, cfg.volume, volBuf, COLOR_ACCENT_CYAN);
+    render_slider(33, cfg.volume, volBuf, UI_COL_AMBER);
     audio_test_beep(800 + cfg.volume * 8, 30);
     return;
   }
 
   // 3. 亮度调节行 (y: 69 ~ 101)
   if (y >= 69 && y <= 101) {
-    int newBri = (x - 70) * 100 / 190;
+    int newBri = (x - 72) * 100 / 188;
     newBri = constrain(newBri, 5, 100);
     cfg.brightness = (uint8_t)newBri;
     display_set_brightness(cfg.brightness);
     settings_save();
     char briBuf[16];
     snprintf(briBuf, sizeof(briBuf), "%d%%", cfg.brightness);
-    render_slider(69, cfg.brightness, briBuf, COLOR_ACCENT_GREEN);
+    render_slider(69, cfg.brightness, briBuf, UI_COL_CYAN);
     audio_test_beep(1200, 30);
     return;
   }

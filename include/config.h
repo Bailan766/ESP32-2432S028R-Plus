@@ -10,7 +10,7 @@
 // 项目与版本信息
 // ------------------------------------------------------------------------------
 #define PROJECT_NAME        "Bailan MP3 Player"
-#define PROJECT_VERSION     "v1.2.1"
+#define PROJECT_VERSION     "v1.2.2"
 #define PROJECT_EDITION     "正式版"
 #define PROJECT_AUTHOR      "摆烂233"
 #define HARDWARE_REVISION   "ESP32-2432S028R-Plus"
@@ -142,12 +142,12 @@
 // ------------------------------------------------------------------------------
 // 颜色定义 (RGB565 格式，适配 TFT_eSPI)
 // ------------------------------------------------------------------------------
-#define COLOR_BG_DARK     0x0842 // 极深灰黑
-#define COLOR_PANEL_BG    0x18E3 // 深蓝灰卡片底色
-#define COLOR_PANEL_BORDER 0x39E7 // 卡片高光边框
-#define COLOR_ACCENT_CYAN 0x07FF // 科技青蓝
-#define COLOR_ACCENT_GREEN 0x07E0 // 荧光绿
-#define COLOR_ACCENT_ORANGE 0xFD20 // 亮橙色
-#define COLOR_TEXT_PRIMARY 0xFFFF // 白色主文本
-#define COLOR_TEXT_MUTED  0x8410 // 暗灰次级文本
-#define COLOR_DANGER      0xF800 // 警告红
+#define COLOR_BG_DARK     0x1082 // 极深灰黑
+#define COLOR_PANEL_BG    0x18E4 // 深蓝灰卡片底色
+#define COLOR_PANEL_BORDER 0x2146 // 卡片高光边框
+#define COLOR_ACCENT_CYAN 0x069F // 科技青蓝
+#define COLOR_ACCENT_GREEN 0x2E6E // 荧光绿
+#define COLOR_ACCENT_ORANGE 0xFBC0 // 亮橙色
+#define COLOR_TEXT_PRIMARY 0xF7BF // 白色主文本
+#define COLOR_TEXT_MUTED  0x8C94 // 暗灰次级文本
+#define COLOR_DANGER      0xF249 // 警告红
