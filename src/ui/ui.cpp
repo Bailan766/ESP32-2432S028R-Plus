@@ -7,7 +7,6 @@
 #include "settings.h"
 #include "hardware_test_ui.h"
 #include "touch_cal_ui.h"
-#include "delta_pwd_ui.h"
 #include "novel_list.h"
 #include "novel_reader_ui.h"
 #include "reader/novel.h"
@@ -140,10 +139,8 @@ void ui_init() {
   // 防止点击事件立即穿透到下一个界面
   delay(200); 
 
-  if (goCalibration || settings_get().bootCalibrate) {
-    if (settings_get().bootCalibrate) {
-      LOG_UI("检测到强制开机自动校准，直接跳转校准页面");
-    }
+  if (goCalibration) {
+    LOG_UI("检测到硬件 BOOT 键长按，进入触屏校准");
     ui_switch_to(UI_PAGE_TOUCH_CAL);
   } else {
     ui_switch_to(UI_PAGE_LOCKSCREEN);
@@ -182,10 +179,7 @@ void ui_switch_to(UIPage page) {
     case UI_PAGE_TOUCH_CAL:
       touch_cal_ui_enter();
       break;
-    case UI_PAGE_DELTA_PWD:
-      delta_ui_enter();
-      break;
-    case UI_PAGE_NOVEL_LIST:
+        case UI_PAGE_NOVEL_LIST:
       novel_list_enter();
       break;
     case UI_PAGE_NOVEL_READER:
@@ -242,10 +236,7 @@ void ui_update() {
     case UI_PAGE_TOUCH_CAL:
       touch_cal_ui_update();
       break;
-    case UI_PAGE_DELTA_PWD:
-      delta_ui_update();
-      break;
-    case UI_PAGE_NOVEL_LIST:
+        case UI_PAGE_NOVEL_LIST:
       novel_list_update();
       break;
     case UI_PAGE_NOVEL_READER:
@@ -305,10 +296,7 @@ void ui_handle_touch(int16_t x, int16_t y) {
     case UI_PAGE_TOUCH_CAL:
       touch_cal_ui_handle_touch(x, y);
       break;
-    case UI_PAGE_DELTA_PWD:
-      delta_ui_handle_touch(x, y);
-      break;
-    case UI_PAGE_NOVEL_LIST:
+        case UI_PAGE_NOVEL_LIST:
       novel_list_handle_touch(x, y);
       break;
     case UI_PAGE_NOVEL_READER:
@@ -335,9 +323,8 @@ void ui_handle_button_click() {
     audio_test_beep(1000, 40);
     ui_switch_to(UI_PAGE_HOME);
   } else if (s_currentPage == UI_PAGE_HOME) {
-    // 在主页单击直接进入触屏精准校准！
-    LOG_UI("主页单击 BOOT -> 直达触屏校准");
-    ui_switch_to(UI_PAGE_TOUCH_CAL);
+    LOG_UI("主页单击 BOOT -> 锁屏");
+    ui_switch_to(UI_PAGE_LOCKSCREEN);
   } else if (s_currentPage == UI_PAGE_TOUCH_CAL) {
     LOG_UI("校准页短按 BOOT -> 跳过校准");
     audio_test_beep(1000, 60);

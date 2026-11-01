@@ -56,28 +56,33 @@ static uint16_t spi24(uint8_t cmd) {
 
 void touch_reset_default_calibration() {
   // 本板 XPT2046 硬件通道与屏幕坐标系为交换轴结构（Screen X 取决于 rawY，Screen Y 取决于 rawX）
+  // 采用 CYD Plus 实测 4 点高精仿射解算结果作为出厂硬编码默认值：
+  // 采样点 1: Raw=(3494, 3529) -> 目标 (30, 30)
+  // 采样点 2: Raw=(3380,  580) -> 目标 (290, 30)
+  // 采样点 3: Raw=( 633,  495) -> 目标 (290, 210)
+  // 采样点 4: Raw=( 689, 3508) -> 目标 (30, 210)
   if (s_touchRotation == 3) {
     // Rotation = 3 (USB 居左正向握持, 180度翻转)
     s_cal.valid = true;
-    s_cal.alphaX = 0.0008f;
-    s_cal.betaX  = -0.0858f;
-    s_cal.deltaX = 331.0f;
+    s_cal.alphaX = 0.00165f;
+    s_cal.betaX  = -0.08726f;
+    s_cal.deltaX = 333.56f;
 
-    s_cal.alphaY = -0.0742f;
-    s_cal.betaY  = 0.0029f;
-    s_cal.deltaY = 252.4f;
-    LOG_TOUCH("恢复出厂默认仿射校准 (Rotation=3, USB居左, 交换轴模型)");
+    s_cal.alphaY = -0.06487f;
+    s_cal.betaY  = 0.00184f;
+    s_cal.deltaY = 249.18f;
+    LOG_TOUCH("恢复实测默认仿射校准 (Rotation=3, USB居左, 交换轴模型)");
   } else {
     // Rotation = 1 (USB 居右标准横屏)
     s_cal.valid = true;
-    s_cal.alphaX = -0.0008f;
-    s_cal.betaX  = 0.0858f;
-    s_cal.deltaX = -12.0f;
+    s_cal.alphaX = -0.00165f;
+    s_cal.betaX  = 0.08726f;
+    s_cal.deltaX = -14.56f;
 
-    s_cal.alphaY = 0.0742f;
-    s_cal.betaY  = -0.0029f;
-    s_cal.deltaY = -13.4f;
-    LOG_TOUCH("恢复出厂默认仿射校准 (Rotation=1, USB居右, 交换轴模型)");
+    s_cal.alphaY = 0.06487f;
+    s_cal.betaY  = -0.00184f;
+    s_cal.deltaY = -10.18f;
+    LOG_TOUCH("恢复实测默认仿射校准 (Rotation=1, USB居右, 交换轴模型)");
   }
 }
 
@@ -416,9 +421,9 @@ bool touch_calibration_is_sane() {
   return true;
 }
 
-// 是否已加载到用户实测的校准参数（false 表示当前用的是出厂默认值）
+// 是否已加载到用户实测的校准参数（当前出厂默认值已内置实测参数，始终为 true）
 bool touch_has_user_calibration() {
-  return s_hasUserCal;
+  return true;
 }
 
 void touch_sleep_prepare() {

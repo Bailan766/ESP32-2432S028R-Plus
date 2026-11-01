@@ -150,7 +150,7 @@ void home_handle_touch(int16_t x, int16_t y) {
   // 底部 TF 卡状态横幅 (y >= 192): 点击直接重新检测并刷新曲库与小说
   if (y >= 192) {
     audio_test_beep(2000, 80);
-    sdcard_reinit();
+    sdcard_reinit(true);
     scanner_scan_all();
     novel_scan_all();
     home_enter(); // 立即重新渲染首页以刷新容量、曲库数与书籍数

@@ -6,7 +6,7 @@ static uint32_t s_sdSizeMB = 0;
 // 挂载重试频率阶梯：CYD 板载 TF 卡槽信号完整性一般，
 // 大容量卡（SDXC 64GB+）在 4MHz 下更容易出现"这次能挂、下次挂不上"的临界现象。
 // 100kHz 放在最后，用于唤醒被软复位打断后卡死的卡片。
-static const uint32_t kMountFreqs[] = { 4000000, 1000000, 400000, 100000, 4000000 };
+static const uint32_t kMountFreqs[] = { 4000000, 1000000, 400000, 100000 };
 static const int kMountFreqCount = sizeof(kMountFreqs) / sizeof(kMountFreqs[0]);
 
 // 总线恢复序列
@@ -95,10 +95,23 @@ void sdcard_init() {
   }
 }
 
-bool sdcard_reinit() {
+bool sdcard_reinit(bool thorough) {
   SD.end();
-  delay(80);
+  delay(30);
 
+  if (!thorough) {
+    // 快速探测模式 (用于后台定时轮询):
+    // 仅尝试一次标准速度挂载，若未插卡将在一次超时 (~800ms) 内立刻退出，
+    // 严禁执行 5 级降频阶梯，彻底杜绝导致 UI 界面和触屏校准假死。
+    sdBusRecover();
+    delay(40);
+    if (mountOnce(SD_SPI_SPEED)) return true;
+    s_sdState = SD_STATE_NOT_FOUND;
+    s_sdSizeMB = 0;
+    return false;
+  }
+
+  // 深度恢复模式 (用于开机或用户手动点击「重扫TF卡」按钮)
   if (mountWithRetry("重新挂载")) return true;
 
   LOG_SD("重新检测: 未检测到 TF 卡");

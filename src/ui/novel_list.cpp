@@ -111,7 +111,7 @@ void novel_list_handle_touch(int16_t x, int16_t y) {
   // 2. 顶部重新扫描按钮 (x: 150..220, y: 0..32)
   if (x >= 150 && x <= 220 && y <= 32) {
     audio_test_beep(2000, 60);
-    sdcard_reinit();
+    sdcard_reinit(true);
     novel_scan_all();
     s_listPage = 0;
     renderList();

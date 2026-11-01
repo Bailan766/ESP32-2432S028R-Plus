@@ -85,8 +85,7 @@ BailanMP3/
 │       ├── home.h / .cpp       # 6 大功能卡片主菜单 (音乐/小说/曲库/历史/设置/摸鱼大厅)
 │       ├── font_cn.h / .cpp    # 7445 全量汉字点阵字库与 GB2312 映射表
 │       ├── clock_ui.h / .cpp   # 实时数字时钟、气象看板与桌面解锁仪表盘
-│       ├── game_menu.h / .cpp  # 摸鱼大厅菜单 (2048 / 木鱼 / 三角洲密码)
-│       ├── delta_pwd_ui.h/.cpp # 三角洲每日密码联网查询页
+│       ├── game_menu.h / .cpp  # 摸鱼大厅菜单 (2048 / 电子木鱼)
 │       ├── novel_list.h / .cpp # 小说书架分页浏览界面
 │       ├── novel_reader_ui.h/.cpp # 沉浸式阅读界面与悬浮控制面板
 │       ├── player_ui.h / .cpp  # 播放器主界面 (16段动态跳动频谱、进度条)

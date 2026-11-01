@@ -48,11 +48,6 @@ static void renderBase() {
     font_draw_string(150, 110, "[未插卡]", TFT_YELLOW, COLOR_BG_DARK, 1);
   }
 
-  // 触屏校准快捷入口按键
-  tft.fillRoundRect(210, 108, 102, 22, 4, 0x10A2);
-  tft.drawRoundRect(210, 108, 102, 22, 4, COLOR_ACCENT_CYAN);
-  font_draw_string_center(261, 111, "校准触控", COLOR_ACCENT_CYAN, 0x10A2, 1);
-
   // 分隔线
   tft.drawLine(10, 134, 310, 134, COLOR_PANEL_BORDER);
 
@@ -137,12 +132,6 @@ void hardware_test_ui_handle_touch(int16_t x, int16_t y) {
     else if (s_testRgbPhase == 3) rgb_set_color(0, 0, 255); // 蓝
     else if (s_testRgbPhase == 4) rgb_set_color(180, 180, 180); // 白
     else rgb_set_color(0, 0, 0);                           // 灭
-    return;
-  }
-
-  // 4. 校准触控按键 (x: 200 ~ 318, y: 106 ~ 132)
-  if (x >= 200 && x <= 318 && y >= 106 && y <= 132) {
-    ui_switch_to(UI_PAGE_TOUCH_CAL);
     return;
   }
 }

@@ -19,7 +19,7 @@ void settings_init() {
   if (s_settings.screenRotation != 1 && s_settings.screenRotation != 3) {
     s_settings.screenRotation = 3;
   }
-  s_settings.bootCalibrate = s_prefs.getBool("boot_cal", true); // 默认开机自动校准
+  s_settings.bootCalibrate = false; // 严禁自动进入校准，仅物理长按 BOOT 键触发
   s_settings.lastTrackId = s_prefs.getInt("last_t", 0);
   s_settings.lastPositionSec = s_prefs.getUShort("last_p", 0);
 

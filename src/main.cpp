@@ -89,17 +89,7 @@ void setup() {
   touch_init();
   touch_set_rotation(settings_get().screenRotation);
 
-  // 校准数据自检：
-  //   1) 没有加载到用户实测校准（当前用的是出厂默认值，与本块屏未必匹配）
-  //   2) 或矩阵异常（主系数接近 0，说明采样点被打乱、矩阵被转置）
-  // 这两种情况都会让触摸整体错位（点左下跳到右上），用户完全无法操作。
-  // 此时强制进入开机校准流程，给出一条不需要按键、不需要触摸的自救路径。
-  // 注意只改内存中的开关、不写 NVS，校准成功后下次开机自然恢复正常。
-  if (!touch_has_user_calibration() || !touch_calibration_is_sane()) {
-    LOG_SYS("触摸校准不可用 (用户校准=%s)，本次开机强制进入校准流程",
-            touch_has_user_calibration() ? "有" : "无");
-    settings_get().bootCalibrate = true;
-  }
+  settings_get().bootCalibrate = false;
 
   // 10. 初始化播放引擎与最近播放
   player_init();
@@ -222,15 +212,18 @@ void loop() {
   //     因此这里不设总次数上限：前 4 次每 30 秒快试，之后降为每 2 分钟一次并长期保持，
   //     用户随时重新插拔卡片都能在 2 分钟内被自动认到，无需手动点「重扫」。
   {
-    static unsigned long s_lastSdRetry = 0;
+    static unsigned long s_lastSdRetry = millis();
     static uint16_t s_sdRetryCount = 0;
-    if (!sdcard_is_available()) {
+    if (ui_get_current_page() == UI_PAGE_TOUCH_CAL) {
+      // 触屏校准拥有最高优先权，校准期间彻底暂停后台探测，避免打断十字采集
+      s_lastSdRetry = millis();
+    } else if (!sdcard_is_available()) {
       const uint32_t interval = (s_sdRetryCount < 4) ? 30000UL : 120000UL;
       if (millis() - s_lastSdRetry >= interval) {
         s_lastSdRetry = millis();
         s_sdRetryCount++;
         LOG_SD("后台重试挂载 TF 卡 (第 %u 次)...", s_sdRetryCount);
-        if (sdcard_reinit()) {
+        if (sdcard_reinit(false)) { // 快速探测，无卡快速返回，不阻塞主循环
           scanner_scan_all();   // 挂上后立刻重扫曲库
         }
       }
