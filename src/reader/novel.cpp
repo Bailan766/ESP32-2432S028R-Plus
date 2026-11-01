@@ -1,5 +1,5 @@
 #include "novel.h"
-#include "demo_novel.h"
+#include "douluo2_text.h"
 #include "storage/sdcard.h"
 #include "hardware/display.h"
 #include "hardware/battery.h"
@@ -85,6 +85,9 @@ static void scanDir(File dir, int depth) {
         String base = (slash >= 0) ? name.substring(slash + 1) : name;
         int dot = base.lastIndexOf('.');
         String title = (dot >= 0) ? base.substring(0, dot) : base;
+        if (title.equalsIgnoreCase("douluo2") || title.equalsIgnoreCase("douluo") || title.indexOf("斗罗") >= 0) {
+          title = "斗罗大陆2绝世唐门";
+        }
 
         NovelItem& item = s_books[s_bookCount];
         strncpy(item.title, title.c_str(), sizeof(item.title) - 1);
@@ -116,11 +119,56 @@ void novel_init() {
   novel_scan_all();
 }
 
+static void ensure_douluo2_on_sd() {
+  if (!sdcard_is_available()) return;
+
+  if (SD.exists("/novel/斗罗大陆2.txt") || SD.exists("/斗罗大陆2.txt") ||
+      SD.exists("/novel/斗罗大陆2绝世唐门.txt") || SD.exists("/斗罗大陆2绝世唐门.txt") ||
+      SD.exists("/novel/douluo2.txt") || SD.exists("/douluo2.txt")) {
+    return;
+  }
+
+  if (!SD.exists("/novel")) {
+    SD.mkdir("/novel");
+  }
+
+  LOG_SD("正在自动向 TF 卡写入《斗罗大陆2绝世唐门.txt》...");
+  File f = SD.open("/novel/斗罗大陆2.txt", FILE_WRITE);
+  if (!f) {
+    f = SD.open("/斗罗大陆2.txt", FILE_WRITE);
+  }
+  if (!f) {
+    f = SD.open("/novel/douluo2.txt", FILE_WRITE);
+  }
+  if (!f) {
+    LOG_SD("TF 卡创建斗罗大陆2文件失败");
+    return;
+  }
+
+  const char* p = DOULUO2_TEXT;
+  size_t total = strlen_P(p);
+  uint8_t chunk[256];
+  size_t written = 0;
+  while (written < total) {
+    size_t toWrite = total - written;
+    if (toWrite > sizeof(chunk)) toWrite = sizeof(chunk);
+    memcpy_P(chunk, p + written, toWrite);
+    size_t w = f.write(chunk, toWrite);
+    if (w == 0) break;
+    written += w;
+  }
+  f.flush();
+  f.close();
+  LOG_SD("《斗罗大陆2绝世唐门.txt》成功写入 TF 卡！共计 %u 字节", (unsigned)written);
+}
+
 void novel_scan_all() {
   s_bookCount = 0;
   s_currentBookIdx = -1;
 
   if (sdcard_is_available()) {
+    ensure_douluo2_on_sd();
+
     File novelDir = SD.open("/novel");
     if (novelDir && novelDir.isDirectory()) {
       scanDir(novelDir, 0);
@@ -131,7 +179,6 @@ void novel_scan_all() {
       scanDir(novelsDir, 0);
       novelsDir.close();
     }
-    // 扫描根目录
     File rootDir = SD.open("/");
     if (rootDir) {
       scanDir(rootDir, 0);
@@ -139,16 +186,16 @@ void novel_scan_all() {
     }
   }
 
-  // 如果没有扫描到任何小说，自动注入内置演示小说
+  // 若 TF 卡中暂无小说，自动注入内置《斗罗大陆2绝世唐门》
   if (s_bookCount == 0) {
     NovelItem& item = s_books[s_bookCount];
-    strncpy(item.title, DEMO_NOVEL_TITLE, sizeof(item.title) - 1);
-    strcpy(item.path, "ROM://demo_novel");
-    item.file_size = strlen_P(DEMO_NOVEL_TEXT);
+    strncpy(item.title, DOULUO2_TITLE, sizeof(item.title) - 1);
+    strcpy(item.path, "ROM://douluo2");
+    item.file_size = strlen_P(DOULUO2_TEXT);
     item.is_demo = true;
     loadBookmarksForBook(item);
     s_bookCount = 1;
-    LOG_SD("已注入内置演示小说: 《%s》", DEMO_NOVEL_TITLE);
+    LOG_SD("已注入内置小说: 《%s》", DOULUO2_TITLE);
   }
 
   LOG_SD("小说书架就绪，共计 %d 本书籍", s_bookCount);
@@ -396,11 +443,11 @@ void novel_render_current_page() {
   int bufLen = 0;
 
   if (curBook->is_demo) {
-    int totalLen = strlen_P(DEMO_NOVEL_TEXT);
+    int totalLen = strlen_P(DOULUO2_TEXT);
     int readLen = totalLen - s_currentOffset;
     if (readLen > (int)sizeof(readBuf)) readLen = sizeof(readBuf);
     if (readLen > 0) {
-      memcpy_P(readBuf, DEMO_NOVEL_TEXT + s_currentOffset, readLen);
+      memcpy_P(readBuf, DOULUO2_TEXT + s_currentOffset, readLen);
       bufLen = readLen;
     }
   } else {
