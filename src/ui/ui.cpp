@@ -1,5 +1,6 @@
 #include "web_manager_ui.h"
 #include "web_radio_ui.h"
+#include "battery_curve_ui.h"
 #include "ui.h"
 #include "font_cn.h"
 #include "home.h"
@@ -117,7 +118,6 @@ void ui_init() {
       break;
     }
 
-
     delay(50);
   }
 
@@ -164,7 +164,7 @@ void ui_switch_to(UIPage page) {
     case UI_PAGE_TOUCH_CAL:
       touch_cal_ui_enter();
       break;
-        case UI_PAGE_NOVEL_LIST:
+    case UI_PAGE_NOVEL_LIST:
       novel_list_enter();
       break;
     case UI_PAGE_NOVEL_READER:
@@ -187,6 +187,9 @@ void ui_switch_to(UIPage page) {
       break;
     case UI_PAGE_WEB_RADIO:
       web_radio_ui_enter();
+      break;
+    case UI_PAGE_BATTERY_CURVE:
+      battery_curve_ui_enter();
       break;
     default:
       break;
@@ -230,7 +233,7 @@ void ui_update() {
     case UI_PAGE_TOUCH_CAL:
       touch_cal_ui_update();
       break;
-        case UI_PAGE_NOVEL_LIST:
+    case UI_PAGE_NOVEL_LIST:
       novel_list_update();
       break;
     case UI_PAGE_NOVEL_READER:
@@ -254,6 +257,9 @@ void ui_update() {
     case UI_PAGE_WEB_RADIO:
       web_radio_ui_update();
       break;
+    case UI_PAGE_BATTERY_CURVE:
+      battery_curve_ui_update();
+      break;
     default:
       break;
   }
@@ -265,17 +271,28 @@ void ui_update() {
         s_currentPage != UI_PAGE_SPLASH && 
         s_currentPage != UI_PAGE_TOUCH_CAL) {
       int bx = 276, by = 8, bw = 30, bh = 14;
-    TFT_eSPI& tft = display_get_tft();
-    int fillW = map(battery_get_percent(), 0, 100, 0, bw - 4);
-    fillW = constrain(fillW, 0, bw - 4);
-    uint16_t bCol = battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN;
-    tft.fillRect(bx + 2, by + 2, fillW, bh - 4, bCol);
-    tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, COLOR_BG_DARK);
+      TFT_eSPI& tft = display_get_tft();
+      int fillW = map(battery_get_percent(), 0, 100, 0, bw - 4);
+      fillW = constrain(fillW, 0, bw - 4);
+      uint16_t bCol = battery_is_low() ? TFT_RED : COLOR_ACCENT_GREEN;
+      tft.fillRect(bx + 2, by + 2, fillW, bh - 4, bCol);
+      tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, COLOR_BG_DARK);
     }
   }
 }
 
 void ui_handle_touch(int16_t x, int16_t y) {
+  // 顶栏右上角电池区域快捷点击 -> 直接打开耗电曲线
+  if (y <= 30 && x >= 180 && 
+      s_currentPage != UI_PAGE_LOCKSCREEN && 
+      s_currentPage != UI_PAGE_TOUCH_CAL && 
+      s_currentPage != UI_PAGE_SPLASH &&
+      s_currentPage != UI_PAGE_BATTERY_CURVE) {
+    audio_test_beep(1400, 30);
+    ui_switch_to(UI_PAGE_BATTERY_CURVE);
+    return;
+  }
+
   switch (s_currentPage) {
     case UI_PAGE_LOCKSCREEN:
       clock_ui_handle_touch(x, y);
@@ -299,7 +316,7 @@ void ui_handle_touch(int16_t x, int16_t y) {
     case UI_PAGE_TOUCH_CAL:
       touch_cal_ui_handle_touch(x, y);
       break;
-        case UI_PAGE_NOVEL_LIST:
+    case UI_PAGE_NOVEL_LIST:
       novel_list_handle_touch(x, y);
       break;
     case UI_PAGE_NOVEL_READER:
@@ -322,6 +339,9 @@ void ui_handle_touch(int16_t x, int16_t y) {
       break;
     case UI_PAGE_WEB_RADIO:
       web_radio_ui_handle_touch(x, y);
+      break;
+    case UI_PAGE_BATTERY_CURVE:
+      battery_curve_ui_handle_touch(x, y);
       break;
     default:
       break;
@@ -368,6 +388,10 @@ void ui_handle_button_click() {
     LOG_UI("书架短按 BOOT -> 返回主页");
     audio_test_beep(1000, 40);
     ui_switch_to(UI_PAGE_HOME);
+  } else if (s_currentPage == UI_PAGE_BATTERY_CURVE) {
+    LOG_UI("耗电曲线中短按 BOOT -> 返回");
+    audio_test_beep(1000, 40);
+    ui_switch_to(s_previousPage != UI_PAGE_SPLASH ? s_previousPage : UI_PAGE_SETTINGS);
   } else {
     // 在子页面短按 BOOT 键直接作为物理【返回】键！
     LOG_UI("物理按键触发返回主页");

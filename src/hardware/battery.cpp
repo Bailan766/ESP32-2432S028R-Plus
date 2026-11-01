@@ -5,6 +5,11 @@ static uint8_t s_batteryPercent = 70;
 static int s_rawAdc = 0;
 static unsigned long s_lastSampleTime = 0;
 
+// 耗电历史点环形缓冲区
+static BatteryPoint s_history[BATTERY_HISTORY_MAX];
+static uint16_t s_historyCount = 0;
+static unsigned long s_lastHistorySample = 0;
+
 // 锂电池典型放电非线性分段线性插值 (基于 3.7V/4.2V 单节锂电池放电特性曲线)
 static uint8_t calcLipoPercent(float v) {
   struct Point { float volt; uint8_t pct; };
@@ -53,6 +58,18 @@ void battery_init() {
   s_batteryVoltage = pinVolt * BATTERY_DIVIDER_RATIO;
   s_batteryPercent = calcLipoPercent(s_batteryVoltage);
   
+  // 记录初始数据基准点
+  BatteryPoint initialPoint;
+  initialPoint.mv = (uint16_t)(s_batteryVoltage * 1000.0f);
+  initialPoint.percent = s_batteryPercent;
+  initialPoint.isUsb = battery_is_usb_powered() ? 1 : 0;
+  initialPoint.timestamp = millis();
+  
+  s_history[0] = initialPoint;
+  s_history[1] = initialPoint;
+  s_historyCount = 2;
+  s_lastHistorySample = millis();
+
   LOG_BATTERY("电池监测初始化完成: ADC=%d, 引脚=%umV, 电池电压=%.2fV, 电量=%d%%",
               s_rawAdc, avgMv, s_batteryVoltage, s_batteryPercent);
 }
@@ -82,6 +99,24 @@ void battery_update() {
   // 采用一阶低通滤波平滑电平波动 (0.85 旧值 + 0.15 新值)
   s_batteryVoltage = s_batteryVoltage * 0.85f + v * 0.15f;
   s_batteryPercent = calcLipoPercent(s_batteryVoltage);
+
+  // 历史数据采样 (每 30 秒记录一次)
+  if (millis() - s_lastHistorySample >= 30000 || s_lastHistorySample == 0) {
+    s_lastHistorySample = millis();
+    BatteryPoint p;
+    p.mv = (uint16_t)(s_batteryVoltage * 1000.0f);
+    p.percent = s_batteryPercent;
+    p.isUsb = battery_is_usb_powered() ? 1 : 0;
+    p.timestamp = millis();
+
+    if (s_historyCount < BATTERY_HISTORY_MAX) {
+      s_history[s_historyCount++] = p;
+    } else {
+      // 队列已满，平移淘汰最旧的点
+      memmove(&s_history[0], &s_history[1], sizeof(BatteryPoint) * (BATTERY_HISTORY_MAX - 1));
+      s_history[BATTERY_HISTORY_MAX - 1] = p;
+    }
+  }
 }
 
 float battery_get_voltage() {
@@ -101,7 +136,55 @@ bool battery_is_low() {
 }
 
 bool battery_is_usb_powered() {
-  // 处于 USB 供电或充电状态时，单节锂电池端电压通常达到 4.05V 以上；
-  // 或者未插入电池（电压 < 2.5V 且设备仍能运行），显然也是由 USB 供电
   return (s_batteryVoltage >= 4.05f || s_batteryVoltage < 2.50f);
+}
+
+uint16_t battery_history_get_count() {
+  return s_historyCount;
+}
+
+const BatteryPoint* battery_history_get_points() {
+  return s_history;
+}
+
+void battery_history_clear() {
+  s_historyCount = 0;
+  s_lastHistorySample = millis();
+  BatteryPoint initialPoint;
+  initialPoint.mv = (uint16_t)(s_batteryVoltage * 1000.0f);
+  initialPoint.percent = s_batteryPercent;
+  initialPoint.isUsb = battery_is_usb_powered() ? 1 : 0;
+  initialPoint.timestamp = millis();
+  s_history[0] = initialPoint;
+  s_historyCount = 1;
+}
+
+float battery_get_discharge_rate_per_hour() {
+  if (s_historyCount < 2) return 0.0f;
+  int startIdx = 0;
+  uint32_t latestTime = s_history[s_historyCount - 1].timestamp;
+  for (int i = s_historyCount - 2; i >= 0; i--) {
+    if (latestTime - s_history[i].timestamp >= 60000) {
+      startIdx = i;
+      break;
+    }
+  }
+  uint32_t dt_ms = latestTime - s_history[startIdx].timestamp;
+  if (dt_ms < 10000) return 0.0f;
+
+  float dp = (float)s_history[s_historyCount - 1].percent - (float)s_history[startIdx].percent;
+  float hours = dt_ms / 3600000.0f;
+  return dp / hours;
+}
+
+float battery_get_estimated_hours_remaining() {
+  float rate = battery_get_discharge_rate_per_hour();
+  if (rate >= -0.5f) {
+    return (s_batteryPercent / 100.0f) * 6.5f;
+  }
+  float dischargeRate = -rate;
+  float remaining = (float)s_batteryPercent / dischargeRate;
+  if (remaining > 24.0f) remaining = 24.0f;
+  if (remaining < 0.1f) remaining = 0.1f;
+  return remaining;
 }

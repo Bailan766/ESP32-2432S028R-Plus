@@ -128,21 +128,26 @@ static void renderSettings() {
   tft.drawRoundRect(216, 141, 94, 36, 5, cfg.resumeEnable ? COLOR_ACCENT_GREEN : COLOR_PANEL_BORDER);
   font_draw_string_center(263, 151, cfg.resumeEnable ? "续播:开启" : "续播:关闭", resCol, resBg, 1);
 
-  // 5. 第二排功能按钮 (y: 181 ~ 217, h: 36, 3 个大按钮)
+  // 5. 第二排功能按钮 (y: 181 ~ 217, h: 36, 4 个按钮)
+  // 耗电曲线
+  tft.fillRoundRect(10, 181, 70, 36, 5, 0x10A2);
+  tft.drawRoundRect(10, 181, 70, 36, 5, COLOR_ACCENT_CYAN);
+  font_draw_string_center(45, 191, "耗电曲线", COLOR_ACCENT_CYAN, 0x10A2, 1);
+
   // 屏幕旋转
-  tft.fillRoundRect(10, 181, 94, 36, 5, 0x10A2);
-  tft.drawRoundRect(10, 181, 94, 36, 5, 0x92BB);
-  font_draw_string_center(57, 191, "屏幕旋转", COLOR_TEXT_PRIMARY, 0x10A2, 1);
+  tft.fillRoundRect(85, 181, 70, 36, 5, 0x10A2);
+  tft.drawRoundRect(85, 181, 70, 36, 5, 0x92BB);
+  font_draw_string_center(120, 191, "屏幕旋转", COLOR_TEXT_PRIMARY, 0x10A2, 1);
 
   // 关于本机
-  tft.fillRoundRect(113, 181, 94, 36, 5, COLOR_PANEL_BG);
-  tft.drawRoundRect(113, 181, 94, 36, 5, COLOR_ACCENT_CYAN);
-  font_draw_string_center(160, 191, "关于本机", COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+  tft.fillRoundRect(160, 181, 70, 36, 5, COLOR_PANEL_BG);
+  tft.drawRoundRect(160, 181, 70, 36, 5, 0x05E0);
+  font_draw_string_center(195, 191, "关于本机", 0x05E0, COLOR_PANEL_BG, 1);
 
   // 重启系统
-  tft.fillRoundRect(216, 181, 94, 36, 5, TFT_RED);
-  tft.drawRoundRect(216, 181, 94, 36, 5, COLOR_TEXT_PRIMARY);
-  font_draw_string_center(263, 191, "重启系统", TFT_WHITE, TFT_RED, 1);
+  tft.fillRoundRect(235, 181, 75, 36, 5, TFT_RED);
+  tft.drawRoundRect(235, 181, 75, 36, 5, COLOR_TEXT_PRIMARY);
+  font_draw_string_center(272, 191, "重启系统", TFT_WHITE, TFT_RED, 1);
 
   // 6. 底部关于信息
   if (s_showAboutDialog) {
@@ -262,10 +267,16 @@ void settings_ui_handle_touch(int16_t x, int16_t y) {
     }
   }
 
-  // 6. 第二排功能按钮 (y: 180 ~ 218, 3 个大按钮)
+  // 6. 第二排功能按钮 (y: 180 ~ 218, 4 个按钮)
   if (y >= 180 && y <= 218) {
-    // 屏幕旋转 (x: 0 ~ 106)
-    if (x >= 0 && x <= 106) {
+    // 耗电曲线 (x: 0 ~ 80)
+    if (x >= 0 && x < 80) {
+      audio_test_beep(1200, 30);
+      ui_switch_to(UI_PAGE_BATTERY_CURVE);
+      return;
+    }
+    // 屏幕旋转 (x: 80 ~ 155)
+    if (x >= 80 && x < 155) {
       uint8_t newRot = (cfg.screenRotation == 3) ? 1 : 3;
       cfg.screenRotation = newRot;
       display_set_rotation(newRot);
@@ -275,15 +286,15 @@ void settings_ui_handle_touch(int16_t x, int16_t y) {
       renderSettings();
       return;
     }
-    // 关于本机 (x: 107 ~ 210)
-    if (x >= 107 && x <= 210) {
+    // 关于本机 (x: 155 ~ 230)
+    if (x >= 155 && x < 230) {
       audio_test_beep(1200, 40);
       s_showAboutDialog = true;
       renderSettings();
       return;
     }
-    // 重启系统 (x: 211 ~ 320)
-    if (x >= 211 && x <= 320) {
+    // 重启系统 (x: 230 ~ 320)
+    if (x >= 230 && x <= 320) {
       audio_test_beep(600, 100);
       ESP.restart();
       return;
