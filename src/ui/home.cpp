@@ -58,16 +58,16 @@ static void renderHeroPlayerCard() {
   }
 
   // 清除文字背景区域防重叠
-  tft.fillRect(x + 38, y + 8, 172, 36, UI_COL_SURFACE);
-  font_draw_string(x + 38, y + 8, titleBuf, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+  tft.fillRect(x + 38, y + 8, 168, 36, UI_COL_SURFACE);
+  font_draw_string_clipped(x + 38, y + 8, 168, titleBuf, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
 
   char subBuf[48];
   if (curTrack && strlen(curTrack->artist) > 0) {
-    snprintf(subBuf, sizeof(subBuf), "%s · 44.1kHz DAC2", curTrack->artist);
+    snprintf(subBuf, sizeof(subBuf), "%s · DAC2", curTrack->artist);
   } else {
     snprintf(subBuf, sizeof(subBuf), "点击进入完整播放器");
   }
-  font_draw_string(x + 38, y + 28, subBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(x + 38, y + 28, 168, subBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 
   // 5. 右侧状态指示药丸胶囊 (x: 216, y: 44, w: 86, h: 26)
   int pillX = x + w - 88, pillY = y + 14, pillW = 80, pillH = 26;
@@ -102,8 +102,8 @@ static void renderGridCard(int16_t x, int16_t y, int16_t w, int16_t h,
   tft.fillCircle(x + 12, y + 14, 3, dotCol);
 
   // 标题与副标题
-  font_draw_string(x + 22, y + 6, title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
-  font_draw_string(x + 22, y + 24, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(x + 22, y + 5, w - 26, title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(x + 22, y + 24, w - 26, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 }
 
 void home_enter() {
@@ -133,13 +133,15 @@ void home_enter() {
   renderGridCard(10, 146, 146, 44, "极客大厅", "电台·传书·摸鱼", UI_COL_GREEN);
 
   // Row 1, Col 1: 系统控制 (x: 164, y: 146, w: 146, h: 44)
-  renderGridCard(164, 146, 146, 44, "系统控制", "耗电曲线·硬件管理", UI_COL_TEXT_MUTED);
+  renderGridCard(164, 146, 146, 44, "系统控制", "耗电·硬件·设置", UI_COL_TEXT_MUTED);
 
   // 3. 下位极客底座栏 (y: 196 ~ 234, h = 38, 3 个微胶囊按钮)
   // Left: TF 卡状态 (x: 10, w: 96)
   if (sdcard_is_available()) {
     char tfBuf[32];
-    snprintf(tfBuf, sizeof(tfBuf), "TF:%uM就绪", sdcard_get_size_mb());
+    uint32_t mb = sdcard_get_size_mb();
+    if (mb >= 1024) snprintf(tfBuf, sizeof(tfBuf), "TF:%uG就绪", (unsigned)(mb / 1024));
+    else snprintf(tfBuf, sizeof(tfBuf), "TF:%uM就绪", (unsigned)mb);
     ui_theme_draw_pill_btn(10, 196, 96, 36, tfBuf, UI_COL_GREEN, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
   } else {
     ui_theme_draw_pill_btn(10, 196, 96, 36, "TF:点击挂载", UI_COL_AMBER, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);

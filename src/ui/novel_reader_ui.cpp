@@ -27,7 +27,7 @@ static void drawMenuOverlay() {
     char titleBuf[20];
     strncpy(titleBuf, book->title, sizeof(titleBuf) - 1);
     titleBuf[sizeof(titleBuf) - 1] = '\0';
-    font_draw_string(88, 8, titleBuf, COLOR_TEXT_PRIMARY, 0x10A2, 1);
+    font_draw_string_clipped(88, 8, 144, book->title, COLOR_TEXT_PRIMARY, 0x10A2, 1);
   }
 
   // [退出菜单] 按钮 (x: 238, y: 4, w: 76, h: 26)

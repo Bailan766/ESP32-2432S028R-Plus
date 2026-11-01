@@ -13,6 +13,8 @@ static int s_peakH[SPEC_BARS] = {0};
 static unsigned long s_lastPeakDecay[SPEC_BARS] = {0};
 static unsigned long s_lastSpecTime = 0;
 static unsigned long s_lastProgressTime = 0;
+static const TrackInfo* s_lastUiTrack = nullptr;
+static PlayerState s_lastUiState = STATE_STOPPED;
 
 static void renderStaticElements() {
   TFT_eSPI& tft = display_get_tft();
@@ -33,13 +35,15 @@ static void renderStaticElements() {
 
   // 曲目标题
   const char* songTitle = t && strlen(t->title) > 0 ? t->title : "未选择曲目";
-  font_draw_string(cardX + 16, cardY + 6, songTitle, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(cardX + 16, cardY + 6, cardW - 24, songTitle, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
 
   // 格式与艺术家
   char sub[64];
   snprintf(sub, sizeof(sub), "MP3 44.1kHz DAC2 | %s",
            (t && strlen(t->artist) > 0) ? t->artist : "本地音频");
-  font_draw_string(cardX + 16, cardY + 26, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(cardX + 16, cardY + 26, cardW - 24, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  s_lastUiTrack = t;
+  s_lastUiState = player_get_state();
 
   // 2. 第一排主控按键 (y: 154 ~ 198, h = 44)
   // 上一曲 |< (x: 10, w: 56)
@@ -194,6 +198,10 @@ void player_ui_enter() {
 }
 
 void player_ui_update() {
+  if (player_get_current_track() != s_lastUiTrack || player_get_state() != s_lastUiState) {
+    renderStaticElements();
+    updateProgressBar();
+  }
   updateVisualizer();
 
   if (millis() - s_lastProgressTime >= 1000) {

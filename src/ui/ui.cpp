@@ -1,5 +1,8 @@
 #include "web_manager_ui.h"
 #include "web_radio_ui.h"
+#include "system/web_file_manager.h"
+#include "radio/web_radio.h"
+#include "web_radio_ui.h"
 #include "battery_curve_ui.h"
 #include "ui.h"
 #include "ui_theme.h"
@@ -33,7 +36,18 @@ static UIPage s_currentPage = UI_PAGE_SPLASH;
 static UIPage s_previousPage = UI_PAGE_SPLASH;
 static unsigned long s_lastHeaderRefresh = 0;
 
+static bool page_has_standard_header(UIPage p) {
+  return p != UI_PAGE_LOCKSCREEN &&
+         p != UI_PAGE_SPLASH &&
+         p != UI_PAGE_TOUCH_CAL &&
+         p != UI_PAGE_NOVEL_READER &&
+         p != UI_PAGE_GAME_2048;
+}
+
 void ui_draw_header(const char* title, bool showBackBtn) {
+  display_get_tft().setTextDatum(TL_DATUM);
+  display_get_tft().setTextFont(1);
+  display_get_tft().setTextSize(1);
   TFT_eSPI& tft = display_get_tft();
 
   // 顶部黑底区域 (高度 30px)
@@ -48,7 +62,7 @@ void ui_draw_header(const char* title, bool showBackBtn) {
   }
 
   // 标题文字 (支持中文点阵渲染)
-  font_draw_string(showBackBtn ? 72 : 12, 7, title, UI_COL_TEXT_PRIMARY, UI_COL_BG, 1);
+  font_draw_string_clipped(showBackBtn ? 70 : 12, 7, showBackBtn ? 140 : 198, title, UI_COL_TEXT_PRIMARY, UI_COL_BG, 1);
 
   // 电池电量数值与小图标 (右侧)
   char bBuf[24];
@@ -57,7 +71,11 @@ void ui_draw_header(const char* title, bool showBackBtn) {
   bool usb = battery_is_usb_powered();
   snprintf(bBuf, sizeof(bBuf), "%d%% %.2fV", pct, v);
   tft.setTextColor(battery_is_low() ? UI_COL_RED : (usb ? UI_COL_AMBER : UI_COL_TEXT_MUTED), UI_COL_BG);
-  tft.drawString(bBuf, 186, 9, 1);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(1);
+  tft.setTextSize(1);
+  int16_t bTextX = 274 - (int16_t)strlen(bBuf) * 6;
+  tft.drawString(bBuf, bTextX, 11, 1);
 
   int bx = 278, by = 8, bw = 30, bh = 14;
   tft.drawRoundRect(bx, by, bw, bh, 3, UI_COL_BORDER_LIGHT);
@@ -86,7 +104,7 @@ void ui_init() {
   font_draw_string_center(160, 155, "开发者: 摆烂233", UI_COL_AMBER, UI_COL_BG, 1);
   font_draw_string_center(160, 185, "邮箱: lb1493729@gmail.com", UI_COL_TEXT_MUTED, UI_COL_BG, 1);
   
-  font_draw_string_center(160, 220, "- 轻触屏幕继续 -", UI_COL_TEXT_DIM, UI_COL_BG, 1);
+  font_draw_string_center(160, 218, "- 轻触屏幕继续 -", UI_COL_TEXT_MUTED, UI_COL_BG, 1);
 
   // 等待触摸
   bool touched = false;
@@ -265,7 +283,7 @@ void ui_update() {
   // 每 2 秒微刷新一次通用头部电量指示
   if (millis() - s_lastHeaderRefresh >= 2000) {
     s_lastHeaderRefresh = millis();
-    if (s_currentPage != UI_PAGE_LOCKSCREEN && 
+    if (page_has_standard_header(s_currentPage) &&
         s_currentPage != UI_PAGE_SPLASH && 
         s_currentPage != UI_PAGE_TOUCH_CAL) {
       int bx = 278, by = 8, bw = 30, bh = 14;
@@ -283,7 +301,10 @@ void ui_update() {
 
 void ui_handle_touch(int16_t x, int16_t y) {
   // 顶栏右上角电池区域快捷点击 -> 直接打开耗电曲线
-  if (y <= 30 && x >= 180 && 
+  if (y <= 30 && x >= 216 && page_has_standard_header(s_currentPage) &&
+      s_currentPage != UI_PAGE_BLUETOOTH_SINK &&
+      s_currentPage != UI_PAGE_WEB_RADIO &&
+      s_currentPage != UI_PAGE_WEB_MANAGER &&
       s_currentPage != UI_PAGE_LOCKSCREEN && 
       s_currentPage != UI_PAGE_TOUCH_CAL && 
       s_currentPage != UI_PAGE_SPLASH &&
@@ -392,6 +413,15 @@ void ui_handle_button_click() {
     LOG_UI("耗电曲线中短按 BOOT -> 返回");
     audio_test_beep(1000, 40);
     ui_switch_to(s_previousPage != UI_PAGE_SPLASH ? s_previousPage : UI_PAGE_SETTINGS);
+  } else if (s_currentPage == UI_PAGE_BLUETOOTH_SINK) {
+    bt_speaker_ui_leave();
+    ui_switch_to(UI_PAGE_HOME);
+  } else if (s_currentPage == UI_PAGE_WEB_RADIO) {
+    web_radio_stop();
+    ui_switch_to(UI_PAGE_GAME_MENU);
+  } else if (s_currentPage == UI_PAGE_WEB_MANAGER) {
+    web_file_manager_stop();
+    ui_switch_to(UI_PAGE_GAME_MENU);
   } else {
     LOG_UI("物理按键触发返回主页");
     ui_switch_to(UI_PAGE_LOCKSCREEN);

@@ -28,12 +28,16 @@ static void renderStaticUI() {
   if (WiFi.status() == WL_CONNECTED) {
     char urlBuf[48];
     snprintf(urlBuf, sizeof(urlBuf), "http://%s", ip.c_str());
-    font_draw_string(24, 60, urlBuf, COLOR_ACCENT_GREEN, 0x10A2, 2);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_ACCENT_GREEN, 0x10A2);
+    tft.drawString(urlBuf, 24, 60, 4);
   } else {
     font_draw_string(24, 62, "Wi-Fi 未连接 (请点下方配网)", TFT_YELLOW, 0x10A2, 1);
   }
 
-  font_draw_string(24, 88, "手机/电脑连同WiFi打开网址即可传歌/书", COLOR_ACCENT_CYAN, 0x10A2, 1);
+  font_draw_string_clipped(24, 88, 274, "同WiFi下浏览器打开网址即可传歌/传书", COLOR_ACCENT_CYAN, 0x10A2, 1);
 
   // 2. 状态信息卡片 (x: 14, y: 114, w: 292, h: 68)
   tft.fillRoundRect(14, 114, 292, 68, 6, COLOR_PANEL_BG);
@@ -62,11 +66,11 @@ static void renderDynamicInfo() {
   // 清除旧内容区域 (x: 24, y: 136, w: 270, h: 42)
   tft.fillRect(24, 136, 270, 42, COLOR_PANEL_BG);
 
-  font_draw_string(24, 138, act, TFT_WHITE, COLOR_PANEL_BG, 1);
+  font_draw_string_clipped(24, 138, 270, act, TFT_WHITE, COLOR_PANEL_BG, 1);
 
   char statBuf[48];
   snprintf(statBuf, sizeof(statBuf), "累计接收: %u 个 | TF卡: %s", count, sdcard_get_state_str());
-  font_draw_string(24, 158, statBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  font_draw_string_clipped(24, 158, 270, statBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
 }
 
 void web_manager_ui_enter() {

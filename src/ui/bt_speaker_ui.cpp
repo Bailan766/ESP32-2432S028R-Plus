@@ -85,12 +85,12 @@ static void renderDynamicInfo() {
     tft.fillRect(24, 68, 270, 44, COLOR_PANEL_BG);
 
     // 歌曲名
-    font_draw_string(24, 68, curTitle, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
+    font_draw_string_clipped(24, 68, 270, curTitle, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
 
     // 歌手与设备广播名
     char infoBuf[64];
     snprintf(infoBuf, sizeof(infoBuf), "%s | 蓝牙名: %s", curArtist, bt_sink_get_device_name());
-    font_draw_string(24, 92, infoBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+    font_draw_string_clipped(24, 92, 270, infoBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
   }
 }
 
@@ -196,6 +196,7 @@ void bt_speaker_ui_handle_touch(int16_t x, int16_t y) {
       delay(80);
       bt_sink_start();
       renderStaticUI();
+      renderDynamicInfo();
     }
   }
 }

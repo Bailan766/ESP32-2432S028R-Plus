@@ -25,7 +25,7 @@ static void renderList() {
 
   // 顶部包含曲目总数的标题
   char headerBuf[32];
-  snprintf(headerBuf, sizeof(headerBuf), "%s (共%d首)", s_isRecent ? "最近播放" : "曲库列表", totalItems);
+  snprintf(headerBuf, sizeof(headerBuf), "%s(%d)", s_isRecent ? "最近播放" : "曲库", totalItems);
   ui_draw_header(headerBuf, true);
 
   if (!s_isRecent) {
@@ -63,13 +63,13 @@ static void renderList() {
       // 序号与曲目名 (支持中文渲染)
       char titleBuf[48];
       snprintf(titleBuf, sizeof(titleBuf), "%02d. %s", track->id + 1, track->title);
-      font_draw_string(20, y + 4, titleBuf, isCur ? UI_COL_AMBER : UI_COL_TEXT_PRIMARY, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE, 1);
+      font_draw_string_clipped(20, y + 4, 240, titleBuf, isCur ? UI_COL_AMBER : UI_COL_TEXT_PRIMARY, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE, 1);
 
       // 艺术家与时长
       char subBuf[48];
       snprintf(subBuf, sizeof(subBuf), "%s | %02d:%02d",
                track->artist, track->durationSec / 60, track->durationSec % 60);
-      font_draw_string(20, y + 20, subBuf, UI_COL_TEXT_MUTED, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE, 1);
+      font_draw_string_clipped(20, y + 20, 240, subBuf, UI_COL_TEXT_MUTED, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE, 1);
 
       // 右侧播放箭头
       font_draw_string(266, y + 10, isCur ? "播放中" : "▶", isCur ? UI_COL_AMBER : UI_COL_TEXT_DIM, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE, 1);

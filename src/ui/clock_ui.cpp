@@ -45,6 +45,9 @@ static void drawFlipCard(int16_t x, int16_t y, int16_t w, int16_t h, const char*
   tft.setTextColor(0xFFDE); // 复古象牙白
   tft.setTextFont(7);
   tft.drawString(str, x + w / 2, midY + 1);
+  tft.setTextFont(1);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextSize(1);
 
   // 机械横切缝与固定转轴槽 (Split Seam)
   tft.drawFastHLine(x + 2, midY - 1, w - 4, 0x0000);
@@ -65,7 +68,7 @@ static void renderFlipClock(const struct tm& timeinfo) {
   char ipBuf[32];
   if (WiFi.status() == WL_CONNECTED) {
     snprintf(ipBuf, sizeof(ipBuf), "NTP已校准 | %s", WiFi.SSID().c_str());
-    font_draw_string(14, 6, ipBuf, COLOR_ACCENT_GREEN, 0x0841, 1);
+    font_draw_string_clipped(14, 6, 198, ipBuf, COLOR_ACCENT_GREEN, 0x0841, 1);
   } else {
     font_draw_string(14, 6, "离线时钟 (点下方配网)", COLOR_TEXT_MUTED, 0x0841, 1);
   }
@@ -173,6 +176,9 @@ static void renderClockDashboard(const struct tm& timeinfo) {
   tft.setTextColor(COLOR_TEXT_PRIMARY, COLOR_BG_DARK);
   tft.setTextFont(7);
   tft.drawString(timeStr, 20, 32);
+  tft.setTextFont(1);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextSize(1);
 
   // 日期与星期显示
   char dateBuf[48];
@@ -288,6 +294,9 @@ void clock_ui_update() {
           tft.setTextColor(COLOR_TEXT_PRIMARY, COLOR_BG_DARK);
           tft.setTextFont(7);
           tft.drawString(timeStr, 20, 32);
+  tft.setTextFont(1);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextSize(1);
         }
       }
     }
@@ -296,8 +305,8 @@ void clock_ui_update() {
 
 void clock_ui_handle_touch(int16_t x, int16_t y) {
   // 1. 中间天气卡片点击刷新天气
-  if (y >= 110 && y <= 195) {
-    if (x >= 230 || (!s_isFlipMode && x >= 250)) {
+  if ((s_isFlipMode && y >= 152 && y <= 196) || (!s_isFlipMode && y >= 110 && y <= 176 && x >= 240)) {
+  if (true) {
       audio_test_beep(1500, 40);
       weather_fetch();
       renderCurrentClock();
@@ -306,7 +315,7 @@ void clock_ui_handle_touch(int16_t x, int16_t y) {
   }
 
   // 2. 底部功能按键 (y >= 196)
-  if (y >= 196) {
+  if (y >= (s_isFlipMode ? 197 : 180)) {
     // [进入桌面] (x: 10..106)
     if (x >= 10 && x <= 106) {
       audio_test_beep(1200, 30);

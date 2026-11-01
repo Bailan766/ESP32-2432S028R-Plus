@@ -9,6 +9,20 @@
 
 static unsigned long s_lastAnimUpdate = 0;
 static int8_t s_wavePhase = 0;
+static int s_lastStationIdx = -1;
+static bool s_lastRadioPlaying = false;
+static char s_lastStatusStr[48] = {0};
+
+static void renderWaveBars() {
+  TFT_eSPI& tft = display_get_tft();
+  bool playing = web_radio_is_playing();
+  int waveX = 180, waveY = 152;
+  tft.fillRect(waveX, waveY - 22, 48, 24, COLOR_PANEL_BG);
+  for (int i = 0; i < 6; i++) {
+    int h = playing ? (4 + abs((int)(sin((s_wavePhase + i * 40) * 0.08f) * 16.0f))) : 3;
+    tft.fillRect(waveX + i * 8, waveY - h, 5, h, playing ? COLOR_ACCENT_GREEN : 0x2965);
+  }
+}
 
 static void renderStaticUI() {
   TFT_eSPI& tft = display_get_tft();
@@ -70,16 +84,20 @@ static void renderDynamicInfo() {
 
   // 电台名称与流派
   if (st) {
-    font_draw_string(26, 82, st->name, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 2);
+    uint8_t nameScale = (font_get_string_width(st->name, 2) <= 264) ? 2 : 1;
+    font_draw_string_clipped(26, nameScale == 2 ? 82 : 88, 264, st->name, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, nameScale);
     char genreBuf[32];
     snprintf(genreBuf, sizeof(genreBuf), "流派: %s", st->genre);
-    font_draw_string(26, 116, genreBuf, COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+    font_draw_string_clipped(26, 116, 264, genreBuf, COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
   }
 
   // 状态与动感声波
   const char* status = web_radio_get_status_text();
   uint16_t statusCol = playing ? COLOR_ACCENT_GREEN : COLOR_TEXT_MUTED;
-  font_draw_string(26, 140, status, statusCol, COLOR_PANEL_BG, 1);
+  font_draw_string_clipped(26, 140, 148, status, statusCol, COLOR_PANEL_BG, 1);
+  s_lastStationIdx = idx;
+  s_lastRadioPlaying = playing;
+  snprintf(s_lastStatusStr, sizeof(s_lastStatusStr), "%s", status ? status : "");
 
   // 动感电波条
   int waveX = 180, waveY = 152;
@@ -107,7 +125,15 @@ void web_radio_ui_update() {
   if (millis() - s_lastAnimUpdate >= 80) {
     s_lastAnimUpdate = millis();
     s_wavePhase += 5;
-    renderDynamicInfo();
+    s_wavePhase += 5;
+    const char* curStatus = web_radio_get_status_text();
+    if (web_radio_get_station_index() != s_lastStationIdx ||
+        web_radio_is_playing() != s_lastRadioPlaying ||
+        strcmp(curStatus ? curStatus : "", s_lastStatusStr) != 0) {
+      renderDynamicInfo();
+    } else {
+      renderWaveBars();
+    }
   }
 }
 
@@ -126,7 +152,15 @@ void web_radio_ui_handle_touch(int16_t x, int16_t y) {
     if (x >= 16 && x <= 95) {
       audio_test_beep(1400, 30);
       web_radio_prev();
+      s_wavePhase += 5;
+    const char* curStatus = web_radio_get_status_text();
+    if (web_radio_get_station_index() != s_lastStationIdx ||
+        web_radio_is_playing() != s_lastRadioPlaying ||
+        strcmp(curStatus ? curStatus : "", s_lastStatusStr) != 0) {
       renderDynamicInfo();
+    } else {
+      renderWaveBars();
+    }
       return;
     }
 
@@ -134,7 +168,15 @@ void web_radio_ui_handle_touch(int16_t x, int16_t y) {
     if (x >= 96 && x <= 224) {
       audio_test_beep(1600, 40);
       web_radio_toggle_play();
+      s_wavePhase += 5;
+    const char* curStatus = web_radio_get_status_text();
+    if (web_radio_get_station_index() != s_lastStationIdx ||
+        web_radio_is_playing() != s_lastRadioPlaying ||
+        strcmp(curStatus ? curStatus : "", s_lastStatusStr) != 0) {
       renderDynamicInfo();
+    } else {
+      renderWaveBars();
+    }
       return;
     }
 
@@ -142,7 +184,15 @@ void web_radio_ui_handle_touch(int16_t x, int16_t y) {
     if (x >= 225 && x <= 305) {
       audio_test_beep(1400, 30);
       web_radio_next();
+      s_wavePhase += 5;
+    const char* curStatus = web_radio_get_status_text();
+    if (web_radio_get_station_index() != s_lastStationIdx ||
+        web_radio_is_playing() != s_lastRadioPlaying ||
+        strcmp(curStatus ? curStatus : "", s_lastStatusStr) != 0) {
       renderDynamicInfo();
+    } else {
+      renderWaveBars();
+    }
       return;
     }
   }
@@ -151,7 +201,15 @@ void web_radio_ui_handle_touch(int16_t x, int16_t y) {
   if (x >= 16 && x <= 304 && y >= 72 && y <= 168) {
     audio_test_beep(1500, 30);
     web_radio_toggle_play();
-    renderDynamicInfo();
+    s_wavePhase += 5;
+    const char* curStatus = web_radio_get_status_text();
+    if (web_radio_get_station_index() != s_lastStationIdx ||
+        web_radio_is_playing() != s_lastRadioPlaying ||
+        strcmp(curStatus ? curStatus : "", s_lastStatusStr) != 0) {
+      renderDynamicInfo();
+    } else {
+      renderWaveBars();
+    }
     return;
   }
 }

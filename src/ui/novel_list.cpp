@@ -44,7 +44,7 @@ static void renderList() {
       tft.fillRect(x + 2, y + 8, 3, h - 16, book->last_offset > 0 ? UI_COL_AMBER : UI_COL_BORDER_LIGHT);
 
       // 书名 (支持中文点阵)
-      font_draw_string(x + 14, y + 6, book->title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+      font_draw_string_clipped(x + 14, y + 6, w - 24, book->title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
 
       // 来源与容量
       char infoBuf[32];
@@ -57,7 +57,7 @@ static void renderList() {
           snprintf(infoBuf, sizeof(infoBuf), "TF卡 (%u KB)", book->file_size / 1024);
         }
       }
-      font_draw_string(x + 14, y + 26, infoBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+      font_draw_string_clipped(x + 14, y + 26, 190, infoBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 
       // 历史阅读进度
       char progBuf[24];

@@ -25,7 +25,7 @@ static int s_historyTop = 0;
 
 // 主题配色表 (暗黑水墨、羊皮纸卷、豆沙护眼、深夜星河)
 static const ThemeColors s_themes[] = {
-  { 0x0000, 0xFFFF, 0x10A2, 0x8410, 0x07E0, "暗黑水墨" },
+  { 0x0000, 0xFFFF, 0x10A2, 0xAD55, 0x07E0, "暗黑水墨" },
   { 0xF7BE, 0x2104, 0xEF5B, 0x630C, 0xBA00, "羊皮纸卷" },
   { 0xCE79, 0x0000, 0xBD75, 0x3286, 0x03E0, "豆沙护眼" },
   { 0x0845, 0xCE79, 0x1084, 0x738E, 0x05BF, "深夜星河" }
@@ -395,6 +395,9 @@ void novel_render_current_page() {
   if (!s_isOpen) return;
 
   TFT_eSPI& tft = display_get_tft();
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(1);
+  tft.setTextSize(1);
   const ThemeColors& tc = novel_get_theme_colors();
 
   // 清空整屏为当前主题底色
@@ -410,7 +413,7 @@ void novel_render_current_page() {
     char titleBuf[24];
     strncpy(titleBuf, curBook->title, sizeof(titleBuf) - 1);
     titleBuf[sizeof(titleBuf) - 1] = '\0';
-    font_draw_string(8, 3, titleBuf, tc.text, tc.status_bg, 1);
+    font_draw_string_clipped(8, 3, 192, curBook->title, tc.text, tc.status_bg, 1);
   }
 
   // 顶部右侧：阅读进度百分比与电池电量
@@ -524,7 +527,8 @@ void novel_render_current_page() {
         if (ptr + 1 < bufLen) {
           unicode = (((uint16_t)(b & 0x1F)) << 6) | ((uint16_t)(readBuf[ptr + 1] & 0x3F));
           charBytes = 2;
-          charWidth = 9;
+          charBytes = 2;
+          charWidth = 16;
         } else {
           break;
         }

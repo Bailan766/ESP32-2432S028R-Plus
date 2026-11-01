@@ -86,19 +86,21 @@ static void renderChart() {
   tft.fillRect(0, 72, 35, 118, UI_COL_BG);
 
   // 绘制 Y 轴刻度标签与水平网格虚线
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(1);
   tft.setTextSize(1);
   tft.setTextColor(UI_COL_TEXT_MUTED, UI_COL_BG);
 
   if (s_modeVoltage) {
-    tft.drawString("4.2V", 4, CHART_Y + 2);
-    tft.drawString("3.9V", 4, CHART_Y + CHART_H / 3 - 3);
-    tft.drawString("3.6V", 4, CHART_Y + (CHART_H * 2) / 3 - 3);
-    tft.drawString("3.3V", 4, CHART_Y + CHART_H - 10);
+    tft.drawString("4.2V", 4, CHART_Y + 2, 1);
+    tft.drawString("3.9V", 4, CHART_Y + CHART_H / 3 - 3, 1);
+    tft.drawString("3.6V", 4, CHART_Y + (CHART_H * 2) / 3 - 3, 1);
+    tft.drawString("3.3V", 4, CHART_Y + CHART_H - 10, 1);
   } else {
-    tft.drawString("100%", 4, CHART_Y + 2);
-    tft.drawString("66%",  4, CHART_Y + CHART_H / 3 - 3);
-    tft.drawString("33%",  4, CHART_Y + (CHART_H * 2) / 3 - 3);
-    tft.drawString("0%",   4, CHART_Y + CHART_H - 10);
+    tft.drawString("100%", 4, CHART_Y + 2, 1);
+    tft.drawString("66%",  4, CHART_Y + CHART_H / 3 - 3, 1);
+    tft.drawString("33%",  4, CHART_Y + (CHART_H * 2) / 3 - 3, 1);
+    tft.drawString("0%",   4, CHART_Y + CHART_H - 10, 1);
   }
 
   // 水平网格线
@@ -119,10 +121,10 @@ static void renderChart() {
 
   // X 轴时间刻度标签 (y: 190 ~ 200)
   tft.fillRect(CHART_X, 190, CHART_W, 12, UI_COL_BG);
-  tft.drawString("-60m", CHART_X, 191);
-  tft.drawString("-40m", xT1 - 10, 191);
-  tft.drawString("-20m", xT2 - 10, 191);
-  font_draw_string(CHART_X + CHART_W - 24, 190, "现在", UI_COL_TEXT_MUTED, UI_COL_BG, 1);
+  tft.drawString("-60m", CHART_X, 192, 1);
+  tft.drawString("-40m", xT1 - 10, 192, 1);
+  tft.drawString("-20m", xT2 - 10, 192, 1);
+  tft.drawString("NOW", CHART_X + CHART_W - 20, 192, 1);
 
   // 绘制数据折线与阴影填充
   uint16_t count = battery_history_get_count();
@@ -176,14 +178,15 @@ static void renderChart() {
     if (textX < CHART_X + 4) textX = prevX + 6;
     if (textY < CHART_Y + 4) textY = prevY + 6;
     tft.setTextColor(UI_COL_TEXT_PRIMARY, UI_COL_SURFACE);
-    tft.drawString(curValStr, textX, textY);
+    if (textX + 32 > CHART_X + CHART_W - 2) textX = CHART_X + CHART_W - 34;
+    tft.drawString(curValStr, textX, textY, 1);
   }
 }
 
 static void renderButtons() {
   // 底部按钮栏 (y: 204 ~ 236, h = 32)
   // 1. 切换模式按钮 (x: 10, w: 94)
-  const char* modeText = s_modeVoltage ? "模式: 电压V" : "模式: 百分比";
+  const char* modeText = s_modeVoltage ? "模式: 电压" : "模式: 电量";
   ui_theme_draw_pill_btn(10, 204, 94, 32, modeText, UI_COL_CYAN, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
 
   // 2. 重置曲线按钮 (x: 113, w: 94)

@@ -146,17 +146,24 @@ static void renderBoard() {
   // 右按键 (x: 282, y: 148, w: 28, h: 26)
   tft.fillRoundRect(282, 148, 28, 26, 4, 0x2124);
   tft.drawRoundRect(282, 148, 28, 26, 4, COLOR_ACCENT_CYAN);
+  tft.setTextColor(COLOR_ACCENT_CYAN, 0x2124);
+  tft.setTextDatum(MC_DATUM);
   tft.drawString(">", 296, 161, 2);
 
   // 下按键 (x: 252, y: 178, w: 28, h: 26)
   tft.fillRoundRect(252, 178, 28, 26, 4, 0x2124);
   tft.drawRoundRect(252, 178, 28, 26, 4, COLOR_ACCENT_CYAN);
+  tft.setTextColor(COLOR_ACCENT_CYAN, 0x2124);
+  tft.setTextDatum(MC_DATUM);
   tft.drawString("v", 266, 191, 2);
 
   // 底部返回按键 (x: 222, y: 206, w: 88, h: 24)
   tft.fillRoundRect(222, 206, 88, 24, 4, 0x10A2);
   tft.drawRoundRect(222, 206, 88, 24, 4, COLOR_PANEL_BORDER);
   font_draw_string_center(266, 210, "返回大厅", COLOR_TEXT_MUTED, 0x10A2, 1);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(1);
+  tft.setTextSize(1);
 }
 
 static void initNewGame() {
@@ -273,7 +280,7 @@ void game_2048_handle_touch(int16_t x, int16_t y) {
   // 返回大厅 (x: 222..310, y: 206..236)
   if (x >= 222 && x <= 310 && y >= 206 && y <= 236) {
     audio_test_beep(1000, 30);
-    ui_switch_to(UI_PAGE_HOME);
+    ui_switch_to(UI_PAGE_GAME_MENU);
     return;
   }
 
