@@ -114,17 +114,22 @@ void home_enter() {
     font_draw_string(x + 12, y + 26, "2048 / 电子木鱼", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
   }
 
-  // 底部状态栏横幅 (x: 14, y: 194, w: 292, h: 36)
-  tft.fillRoundRect(14, 194, 292, 36, 6, 0x10A2);
-  tft.drawRoundRect(14, 194, 292, 36, 6, COLOR_PANEL_BORDER);
-
+  // 底部左右双栏 (x: 14, y: 194, w: 292, h: 36)
+  // 左侧: TF 卡状态 (x: 14, y: 194, w: 160, h: 36)
+  tft.fillRoundRect(14, 194, 160, 36, 6, 0x10A2);
+  tft.drawRoundRect(14, 194, 160, 36, 6, COLOR_PANEL_BORDER);
   if (sdcard_is_available()) {
-    char buf[48];
-    snprintf(buf, sizeof(buf), "TF卡已就绪 (%u MB | 点击重扫)", sdcard_get_size_mb());
-    font_draw_string_center(160, 204, buf, TFT_GREEN, 0x10A2, 1);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "TF卡: 就绪 (%uM)", sdcard_get_size_mb());
+    font_draw_string_center(94, 204, buf, TFT_GREEN, 0x10A2, 1);
   } else {
-    font_draw_string_center(160, 204, "TF卡: 未检测到 (点击重新扫描)", TFT_YELLOW, 0x10A2, 1);
+    font_draw_string_center(94, 204, "TF卡: 点击重试", TFT_YELLOW, 0x10A2, 1);
   }
+
+  // 右侧: 蓝牙音箱快捷入口 (x: 180, y: 194, w: 126, h: 36)
+  tft.fillRoundRect(180, 194, 126, 36, 6, 0x0210);
+  tft.drawRoundRect(180, 194, 126, 36, 6, COLOR_ACCENT_CYAN);
+  font_draw_string_center(243, 204, "蓝牙音箱", COLOR_ACCENT_CYAN, 0x0210, 1);
 }
 
 void home_update() {
@@ -147,13 +152,20 @@ void home_handle_touch(int16_t x, int16_t y) {
     return;
   }
 
-  // 底部 TF 卡状态横幅 (y >= 192): 点击直接重新检测并刷新曲库与小说
+  // 底部栏 (y >= 192):
   if (y >= 192) {
-    audio_test_beep(2000, 80);
-    sdcard_reinit(true);
-    scanner_scan_all();
-    novel_scan_all();
-    home_enter(); // 立即重新渲染首页以刷新容量、曲库数与书籍数
+    if (x >= 175) {
+      // 点击右侧 [蓝牙音箱]
+      audio_test_beep(1800, 40);
+      ui_switch_to(UI_PAGE_BLUETOOTH_SINK);
+    } else {
+      // 点击左侧 [TF 卡重扫]
+      audio_test_beep(2000, 80);
+      sdcard_reinit(true);
+      scanner_scan_all();
+      novel_scan_all();
+      home_enter();
+    }
     return;
   }
 

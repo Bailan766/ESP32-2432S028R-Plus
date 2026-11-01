@@ -11,6 +11,7 @@
 #include "novel_reader_ui.h"
 #include "reader/novel.h"
 #include "game_menu.h"
+#include "bt_speaker_ui.h"
 #include "game/game_2048.h"
 #include "game/muyu.h"
 #include "hardware/display.h"
@@ -194,6 +195,9 @@ void ui_switch_to(UIPage page) {
     case UI_PAGE_MUYU:
       muyu_enter();
       break;
+    case UI_PAGE_BLUETOOTH_SINK:
+      bt_speaker_ui_enter();
+      break;
     default:
       break;
   }
@@ -250,6 +254,9 @@ void ui_update() {
       break;
     case UI_PAGE_MUYU:
       muyu_update();
+      break;
+    case UI_PAGE_BLUETOOTH_SINK:
+      bt_speaker_ui_update();
       break;
     default:
       break;
@@ -310,6 +317,9 @@ void ui_handle_touch(int16_t x, int16_t y) {
       break;
     case UI_PAGE_MUYU:
       muyu_handle_touch(x, y);
+      break;
+    case UI_PAGE_BLUETOOTH_SINK:
+      bt_speaker_ui_handle_touch(x, y);
       break;
     default:
       break;

@@ -10,7 +10,7 @@
 // 项目与版本信息
 // ------------------------------------------------------------------------------
 #define PROJECT_NAME        "Bailan MP3 Player"
-#define PROJECT_VERSION     "v1.1.4"
+#define PROJECT_VERSION     "v1.1.5"
 #define PROJECT_EDITION     "正式版"
 #define PROJECT_AUTHOR      "摆烂233"
 #define HARDWARE_REVISION   "ESP32-2432S028R-Plus"
