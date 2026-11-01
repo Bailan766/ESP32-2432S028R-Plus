@@ -216,40 +216,21 @@
     <div class="card">
       <div class="card-title">
         <span class="step-num">1</span>
-        <span>选择刷机模式</span>
+        <span>一键刷入最新固件</span>
       </div>
-      <div class="mode-options">
-        <label class="mode-label">
-          <input type="radio" name="firmware-mode" value="full" checked onchange="switchManifest('manifest.json')">
-          <div class="mode-text">
-            <h3>🚀 全量全新刷入 (强烈推荐)</h3>
-            <p>写入 Bootloader 引导、分区表及 v1.1.4 完整系统。适合首次烧录、或解决死机、触摸失灵等疑难杂症。</p>
-          </div>
-        </label>
-        <label class="mode-label">
-          <input type="radio" name="firmware-mode" value="update" onchange="switchManifest('manifest_update.json')">
-          <div class="mode-text">
-            <h3>⚡ 平滑升级固件 (保留配置)</h3>
-            <p>仅烧录 0x10000 应用程序区。自动保留您的 NVS 设置、Wi-Fi 密码、触控校准参数与播放历史记录。</p>
-          </div>
-        </label>
-      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+        自动烧录完整引导（Bootloader）、分区表与 v1.1.4 应用程序。安装时若<strong>不勾选擦除（Erase）</strong>将自动保留您的 Wi-Fi 配置与触控校准。
+      </p>
 
-      <div style="margin-top: 20px;">
-        <div class="card-title" style="margin-bottom: 8px;">
-          <span class="step-num">2</span>
-          <span>连接并开始刷入</span>
-        </div>
-        <div class="install-box">
-          <esp-web-install-button id="installer" manifest="manifest.json">
-            <button slot="activate" style="cursor:pointer; background-color:#238636; color:#ffffff; padding:12px 28px; border:none; border-radius:6px; font-size:15px; font-weight:600; display:inline-flex; align-items:center; gap:8px;">
-              <span>⚡ 开始连接并刷入</span>
-            </button>
-            <span slot="unsupported">当前浏览器不支持 Web Serial，请换用 Chrome 或 Edge</span>
-            <span slot="not-allowed">出于安全限制，网页刷机必须在 HTTPS 域名或 http://localhost 下运行</span>
-          </esp-web-install-button>
-          <p class="install-tip">点击按钮后，在浏览器弹窗中选中带有 <strong>CH340</strong> 或 <strong>USB-Serial</strong> 的端口即可自动开始。</p>
-        </div>
+      <div class="install-box">
+        <esp-web-install-button id="installer" manifest="manifest.json">
+          <button slot="activate" style="cursor:pointer; background-color:#238636; color:#ffffff; padding:14px 32px; border:none; border-radius:6px; font-size:16px; font-weight:600; display:inline-flex; align-items:center; gap:8px;">
+            <span>⚡ 开始连接并刷入 (v1.1.4 正式版)</span>
+          </button>
+          <span slot="unsupported">当前浏览器不支持 Web Serial，请换用 Chrome 或 Edge</span>
+          <span slot="not-allowed">出于安全限制，网页刷机必须在 HTTPS 域名或 http://localhost 下运行</span>
+        </esp-web-install-button>
+        <p class="install-tip">点击按钮后，在浏览器弹窗中选中带有 <strong>CH340</strong> 或 <strong>USB-Serial</strong> 的端口即可自动开始。</p>
       </div>
     </div>
 
@@ -262,8 +243,8 @@
         <div class="faq-a">1) 确保连接线是「数据线」，许多手机附赠的线是纯充电线，无 D+/D- 信号线。<br>2) 电脑需安装 CH340 虚拟串口驱动（通常 Windows 10/11 联网会自动装好）。</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">Q2: 烧录过程中提示 "Connecting..." 超时失败？</div>
-        <div class="faq-a">部分批次板子串口复位电路电容容值偏大，可尝试：按住开发板背面的 <strong>BOOT 按键不松开</strong>，点击连接，看到开始 Erasing/Writing 后再松开手指。</div>
+        <div class="faq-q">Q2: 烧录时提示 Connecting 超时，或串口无限报 invalid header / RTCWDT_RTC_RESET 重启？</div>
+        <div class="faq-a">这是因为引导区为空或串口处于复位死循环中。<strong>解决方法极度简单</strong>：<br>按住开发板背面的 <strong>BOOT 按键不要松开</strong>，用指甲按一下旁边的 <strong>RST/EN 复位按键</strong>，再松开 BOOT 键。此时板子将稳定停留在下载等待模式，关闭正在占用串口的串口助手/监视器，刷新本网页重新点击「开始连接并刷入」即可 100% 修复！</div>
       </div>
       <div class="faq-item">
         <div class="faq-q">Q3: 刷完之后怎么用？</div>
@@ -279,11 +260,6 @@
   <script>
     if (!('serial' in navigator)) {
       document.getElementById('unsupported-alert').style.display = 'block';
-    }
-
-    function switchManifest(manifestPath) {
-      const installer = document.getElementById('installer');
-      installer.setAttribute('manifest', manifestPath);
     }
   </script>
 </body>
