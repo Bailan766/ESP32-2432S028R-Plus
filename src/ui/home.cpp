@@ -120,10 +120,10 @@ void home_enter() {
   tft.drawRoundRect(14, 194, 160, 36, 6, COLOR_PANEL_BORDER);
   if (sdcard_is_available()) {
     char buf[32];
-    snprintf(buf, sizeof(buf), "TF卡: 就绪 (%uM)", sdcard_get_size_mb());
+    snprintf(buf, sizeof(buf), "TF: %uM (点此重扫)", sdcard_get_size_mb());
     font_draw_string_center(94, 204, buf, TFT_GREEN, 0x10A2, 1);
   } else {
-    font_draw_string_center(94, 204, "TF卡: 点击重试", TFT_YELLOW, 0x10A2, 1);
+    font_draw_string_center(94, 204, "TF卡: 点击手动挂载", TFT_YELLOW, 0x10A2, 1);
   }
 
   // 右侧: 蓝牙音箱快捷入口 (x: 180, y: 194, w: 126, h: 36)
@@ -159,11 +159,21 @@ void home_handle_touch(int16_t x, int16_t y) {
       audio_test_beep(1800, 40);
       ui_switch_to(UI_PAGE_BLUETOOTH_SINK);
     } else {
-      // 点击左侧 [TF 卡重扫]
+      // 点击左侧 [TF 卡手动挂载 / 重扫]
       audio_test_beep(2000, 80);
-      sdcard_reinit(true);
-      scanner_scan_all();
-      novel_scan_all();
+      TFT_eSPI& tft = display_get_tft();
+      tft.fillRoundRect(14, 194, 160, 36, 6, 0x2104);
+      tft.drawRoundRect(14, 194, 160, 36, 6, COLOR_ACCENT_CYAN);
+      font_draw_string_center(94, 204, "正在挂载...", COLOR_ACCENT_CYAN, 0x2104, 1);
+
+      bool ok = sdcard_reinit(true);
+      if (ok) {
+        scanner_scan_all();
+        novel_scan_all();
+        audio_test_beep(2500, 100);
+      } else {
+        audio_test_beep(800, 200);
+      }
       home_enter();
     }
     return;

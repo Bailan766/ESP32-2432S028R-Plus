@@ -207,32 +207,7 @@ void loop() {
   // 11. 网络与天气服务状态机更新
   net_update();
 
-  // 12. TF 卡后台重试挂载
-  //     大容量卡在软复位后会"卡死"，只有物理重新插拔才能恢复。
-  //     因此这里不设总次数上限：前 4 次每 30 秒快试，之后降为每 2 分钟一次并长期保持，
-  //     用户随时重新插拔卡片都能在 2 分钟内被自动认到，无需手动点「重扫」。
-  {
-    static unsigned long s_lastSdRetry = millis();
-    static uint16_t s_sdRetryCount = 0;
-    if (ui_get_current_page() == UI_PAGE_TOUCH_CAL) {
-      // 触屏校准拥有最高优先权，校准期间彻底暂停后台探测，避免打断十字采集
-      s_lastSdRetry = millis();
-    } else if (!sdcard_is_available()) {
-      const uint32_t interval = (s_sdRetryCount < 4) ? 30000UL : 120000UL;
-      if (millis() - s_lastSdRetry >= interval) {
-        s_lastSdRetry = millis();
-        s_sdRetryCount++;
-        LOG_SD("后台重试挂载 TF 卡 (第 %u 次)...", s_sdRetryCount);
-        if (sdcard_reinit(false)) { // 快速探测，无卡快速返回，不阻塞主循环
-          scanner_scan_all();   // 挂上后立刻重扫曲库
-        }
-      }
-    } else {
-      s_sdRetryCount = 0;       // 已挂载则重置计数，掉卡后重新从快试开始
-    }
-  }
-
-  // 13. 息屏且空闲时进入浅睡眠，把 ESP32 自身电流从约 20mA 压到约 1mA。
+  // 12. 息屏且空闲时进入浅睡眠，把 ESP32 自身电流从约 20mA 压到约 1mA。
   //     用定时器 200ms 轮询唤醒，触摸响应延迟不超过 200ms。
   //     不满足条件（亮屏 / 播放中 / 射频开启）时退回普通延时。
   if (power_can_light_sleep()) {

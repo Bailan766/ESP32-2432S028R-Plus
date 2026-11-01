@@ -1,3 +1,6 @@
+#include "storage/sdcard.h"
+#include "storage/scanner.h"
+#include "hardware/audio.h"
 #include "music_list.h"
 #include "ui.h"
 #include "font_cn.h"
@@ -24,10 +27,23 @@ static void renderList() {
   snprintf(headerBuf, sizeof(headerBuf), "%s (共%d首)", s_isRecent ? "最近播放" : "曲库列表", totalItems);
   ui_draw_header(headerBuf, true);
 
+  if (!s_isRecent) {
+    tft.fillRoundRect(154, 3, 64, 24, 4, 0x10A2);
+    tft.drawRoundRect(154, 3, 64, 24, 4, COLOR_ACCENT_GREEN);
+    font_draw_string(160, 7, "重扫", COLOR_ACCENT_GREEN, 0x10A2, 1);
+  }
+
   int startIndex = s_currentPage * ITEMS_PER_PAGE;
 
   if (totalItems == 0) {
-    font_draw_string_center(160, 110, s_isRecent ? "暂无最近播放记录" : "曲库为空 (使用内置曲目)", COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
+    if (!s_isRecent && !sdcard_is_available()) {
+      font_draw_string_center(160, 80, "未检测到TF卡 (使用内置演示曲)", COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
+      tft.fillRoundRect(80, 110, 160, 38, 6, 0x10A2);
+      tft.drawRoundRect(80, 110, 160, 38, 6, COLOR_ACCENT_CYAN);
+      font_draw_string_center(160, 122, "点击手动挂载TF卡", COLOR_ACCENT_CYAN, 0x10A2, 1);
+    } else {
+      font_draw_string_center(160, 110, s_isRecent ? "暂无最近播放记录" : "曲库为空 (使用内置曲目)", COLOR_TEXT_MUTED, COLOR_BG_DARK, 1);
+    }
   } else {
     for (int i = 0; i < ITEMS_PER_PAGE; i++) {
       int idx = startIndex + i;
@@ -95,7 +111,30 @@ void music_list_handle_touch(int16_t x, int16_t y) {
     return;
   }
 
+  // 1.5 顶部重扫按钮 (x: 150..220, y: 0..32)
+  if (!s_isRecent && x >= 150 && x <= 220 && y <= 32) {
+    audio_test_beep(2000, 60);
+    sdcard_reinit(true);
+    scanner_scan_all();
+    s_currentPage = 0;
+    renderList();
+    return;
+  }
+
+
   int totalItems = s_isRecent ? db_get_recent_count() : db_get_track_count();
+
+  // 1.8 曲库为空时点击居中「点击手动挂载TF卡」按钮
+  if (totalItems == 0 && !s_isRecent && !sdcard_is_available()) {
+    if (x >= 70 && x <= 250 && y >= 105 && y <= 155) {
+      audio_test_beep(2000, 80);
+      sdcard_reinit(true);
+      scanner_scan_all();
+      renderList();
+      return;
+    }
+  }
+
   int totalPages = (totalItems + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE;
   if (totalPages == 0) totalPages = 1;
 

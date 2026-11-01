@@ -90,8 +90,6 @@ void ui_init() {
   bool goCalibration = false;
   int16_t tx, ty;
   unsigned long splashStart = millis();
-  unsigned long lastSdRetry = 0;
-  uint8_t sdRetryCount = 0;
 
   while (!touched) {
     if (touch_read(tx, ty)) {
@@ -117,22 +115,6 @@ void ui_init() {
       break;
     }
 
-    // 开机画面期间补试挂载 TF 卡。
-    // 每次重试会阻塞数秒（5 级降频 + 总线恢复），期间无法采样触摸与按键，
-    // 因此：
-    //   1) 只在【不需要进校准】时才补试 —— 校准是优先级最高的自救流程，
-    //      不能因为等 SD 卡而把用户卡在开机画面几十秒；
-    //   2) 最多补试 2 次，后续交给主循环的后台重试。
-    if (!sdcard_is_available() && !settings_get().bootCalibrate && sdRetryCount < 2) {
-      if (millis() - lastSdRetry >= 5000) {
-        lastSdRetry = millis();
-        sdRetryCount++;
-        LOG_SD("开机画面期间重试挂载 TF 卡 (第 %u 次)...", sdRetryCount);
-        if (sdcard_reinit()) {
-          scanner_scan_all();
-        }
-      }
-    }
 
     delay(50);
   }

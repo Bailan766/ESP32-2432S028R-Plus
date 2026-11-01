@@ -1,3 +1,4 @@
+#include "reader/novel.h"
 #include "settings.h"
 #include "ui.h"
 #include "font_cn.h"
@@ -112,7 +113,8 @@ static void renderSettings() {
   // 重扫TF卡 (Orange)
   tft.fillRoundRect(10, 141, 94, 36, 5, 0x10A2);
   tft.drawRoundRect(10, 141, 94, 36, 5, COLOR_ACCENT_ORANGE);
-  font_draw_string_center(57, 151, "重扫TF卡", COLOR_ACCENT_ORANGE, 0x10A2, 1);
+  const char* sdBtn = sdcard_is_available() ? "重扫TF卡" : "挂载TF卡";
+  font_draw_string_center(57, 151, sdBtn, COLOR_ACCENT_ORANGE, 0x10A2, 1);
 
   // 硬件自检 (Green)
   tft.fillRoundRect(113, 141, 94, 36, 5, 0x03E0);
@@ -235,11 +237,12 @@ void settings_ui_handle_touch(int16_t x, int16_t y) {
 
   // 5. 第一排功能按钮 (y: 140 ~ 177, 3 个大按钮)
   if (y >= 140 && y <= 177) {
-    // 重扫TF卡 (x: 0 ~ 106)
+    // 挂载/重扫TF卡 (x: 0 ~ 106)
     if (x >= 0 && x <= 106) {
       audio_test_beep(2000, 100);
       sdcard_reinit(true);
       scanner_scan_all();
+      novel_scan_all();
       renderSettings();
       return;
     }

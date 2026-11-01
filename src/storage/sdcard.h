@@ -12,7 +12,7 @@ enum SDCardState {
 };
 
 void sdcard_init();
-bool sdcard_reinit(bool thorough = false);
+bool sdcard_reinit(bool thorough = true);
 SDCardState sdcard_get_state();
 bool sdcard_is_available();
 uint32_t sdcard_get_size_mb();
