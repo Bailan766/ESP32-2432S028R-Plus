@@ -1,3 +1,5 @@
+#include "web_manager_ui.h"
+#include "web_radio_ui.h"
 #include "ui.h"
 #include "font_cn.h"
 #include "home.h"
@@ -180,6 +182,12 @@ void ui_switch_to(UIPage page) {
     case UI_PAGE_BLUETOOTH_SINK:
       bt_speaker_ui_enter();
       break;
+    case UI_PAGE_WEB_MANAGER:
+      web_manager_ui_enter();
+      break;
+    case UI_PAGE_WEB_RADIO:
+      web_radio_ui_enter();
+      break;
     default:
       break;
   }
@@ -239,6 +247,12 @@ void ui_update() {
       break;
     case UI_PAGE_BLUETOOTH_SINK:
       bt_speaker_ui_update();
+      break;
+    case UI_PAGE_WEB_MANAGER:
+      web_manager_ui_update();
+      break;
+    case UI_PAGE_WEB_RADIO:
+      web_radio_ui_update();
       break;
     default:
       break;
@@ -302,6 +316,12 @@ void ui_handle_touch(int16_t x, int16_t y) {
       break;
     case UI_PAGE_BLUETOOTH_SINK:
       bt_speaker_ui_handle_touch(x, y);
+      break;
+    case UI_PAGE_WEB_MANAGER:
+      web_manager_ui_handle_touch(x, y);
+      break;
+    case UI_PAGE_WEB_RADIO:
+      web_radio_ui_handle_touch(x, y);
       break;
     default:
       break;

@@ -49,27 +49,64 @@ void rgb_set_state(RGBState state) {
   }
 }
 
-void rgb_pulse_pitch(uint16_t freq) {
-  if (s_rgbState != RGB_PLAYING) return;
+static uint8_t s_targetR = 0, s_targetG = 0, s_targetB = 0;
+static unsigned long s_lastRgbDecay = 0;
+
+void rgb_beat_pulse(uint8_t energy, uint16_t freq) {
+  if (s_rgbState != RGB_PLAYING && s_rgbState != RGB_BOOT) return;
+  if (energy < 15) return;
+
+  uint8_t baseR = 0, baseG = 0, baseB = 0;
   if (freq == 0) {
-    rgb_set_color(0, 0, 0);
-    return;
+    static uint16_t hue = 0;
+    hue = (hue + 15) % 360;
+    if (hue < 120) {
+      baseR = 255 - hue * 2;
+      baseG = hue * 2;
+      baseB = 40;
+    } else if (hue < 240) {
+      baseR = 20;
+      baseG = 255 - (hue - 120) * 2;
+      baseB = (hue - 120) * 2;
+    } else {
+      baseR = (hue - 240) * 2;
+      baseG = 20;
+      baseB = 255 - (hue - 240) * 2;
+    }
+  } else if (freq < 250) {
+    baseR = 255; baseG = 40; baseB = 0;    // 低频暖橙红 (重低音轰炸)
+  } else if (freq < 600) {
+    baseR = 240; baseG = 180; baseB = 10;  // 中低频金黄 (人声/节奏)
+  } else if (freq < 1200) {
+    baseR = 10; baseG = 240; baseB = 180;  // 中高频翡翠青蓝
+  } else {
+    baseR = 200; baseG = 10; baseB = 255;  // 极高频炫彩紫电
   }
 
-  // 随音符频率变幻色彩
-  if (freq < 350) {
-    rgb_set_color(220, 40, 0);   // 低频暖橙红
-  } else if (freq < 650) {
-    rgb_set_color(0, 200, 80);   // 中频活力绿
-  } else if (freq < 1000) {
-    rgb_set_color(0, 180, 255);  // 高频科技蓝
-  } else {
-    rgb_set_color(220, 0, 220);  // 极高频炫彩紫
-  }
+  uint8_t r = (uint8_t)(((uint16_t)baseR * energy) / 255);
+  uint8_t g = (uint8_t)(((uint16_t)baseG * energy) / 255);
+  uint8_t b = (uint8_t)(((uint16_t)baseB * energy) / 255);
+
+  if (r > s_targetR) s_targetR = r;
+  if (g > s_targetG) s_targetG = g;
+  if (b > s_targetB) s_targetB = b;
+  rgb_set_color(s_targetR, s_targetG, s_targetB);
+}
+
+void rgb_pulse_pitch(uint16_t freq) {
+  rgb_beat_pulse(200, freq);
 }
 
 void rgb_update() {
-  if (s_rgbState == RGB_PAUSED) {
+  if (s_rgbState == RGB_PLAYING) {
+    if (millis() - s_lastRgbDecay >= 25) {
+      s_lastRgbDecay = millis();
+      s_targetR = (uint8_t)((s_targetR * 82) / 100);
+      s_targetG = (uint8_t)((s_targetG * 82) / 100);
+      s_targetB = (uint8_t)((s_targetB * 82) / 100);
+      rgb_set_color(s_targetR, s_targetG, s_targetB);
+    }
+  } else if (s_rgbState == RGB_PAUSED) {
     // 暂停状态：慢速呼吸蓝灯
     float breath = (sin(millis() / 450.0f) + 1.0f) * 0.5f; // 0.0 ~ 1.0
     uint8_t b = (uint8_t)(breath * 130.0f);

@@ -1,3 +1,4 @@
+#include "hardware/rgb.h"
 #include "bt_speaker_ui.h"
 #include "bluetooth/bt_sink.h"
 #include "hardware/display.h"
@@ -140,6 +141,13 @@ static void renderSpectrumBars() {
     else if (h > 10) barCol = 0x07E0; // 翠绿
 
     tft.fillRect(bx, by, BAR_W, h, barCol);
+  }
+
+  if (bt_sink_get_state() == BT_STATE_PLAYING) {
+    int totalH = 0;
+    for (int i = 0; i < NUM_BARS; i++) totalH += s_barHeights[i];
+    uint8_t energy = constrain(map(totalH, 0, NUM_BARS * 25, 20, 255), 0, 255);
+    rgb_beat_pulse(energy, s_barHeights[2] * 40);
   }
 }
 

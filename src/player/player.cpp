@@ -174,6 +174,12 @@ uint16_t player_get_current_note_freq() {
 void player_update() {
   if (s_playerState != STATE_PLAYING) return;
 
+  static unsigned long s_lastBgRgb = 0;
+  if (millis() - s_lastBgRgb >= 70) {
+    s_lastBgRgb = millis();
+    rgb_beat_pulse(random(80, 220), random(150, 1500));
+  }
+
   // 1. 每秒更新播放时间
   if (millis() - s_lastSecondTimer >= 1000) {
     s_lastSecondTimer += 1000;

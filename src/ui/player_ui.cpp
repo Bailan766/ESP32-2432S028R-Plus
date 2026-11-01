@@ -1,3 +1,4 @@
+#include "hardware/rgb.h"
 #include "player_ui.h"
 #include "ui.h"
 #include "font_cn.h"
@@ -144,6 +145,13 @@ static void updateVisualizer() {
       uint16_t col = (h > 30) ? TFT_RED : ((h > 16) ? TFT_YELLOW : COLOR_ACCENT_GREEN);
       tft.fillRect(bx, by, barW, h, col);
     }
+  }
+
+  if (playing) {
+    int totalH = 0;
+    for (int i = 0; i < SPEC_BARS; i++) totalH += s_specH[i];
+    uint8_t energy = constrain(map(totalH, 0, SPEC_BARS * 28, 20, 255), 0, 255);
+    rgb_beat_pulse(energy, freq);
   }
 }
 

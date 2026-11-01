@@ -151,6 +151,10 @@ uint8_t audio_get_volume() {
   return s_volume;
 }
 
+AudioOutput* audio_get_output() {
+  return s_out;
+}
+
 bool audio_play_mp3(const char* filepath) {
   audio_stop();
   if (!s_file->open(filepath)) {

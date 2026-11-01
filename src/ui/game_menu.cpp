@@ -9,30 +9,66 @@ static void renderGameMenu() {
   TFT_eSPI& tft = display_get_tft();
   tft.fillScreen(COLOR_BG_DARK);
 
-  ui_draw_header("摸鱼大厅", true);
+  ui_draw_header("摸鱼与功能大厅", true);
 
-  // 卡片 1: 2048 (x: 14, y: 38, w: 292, h: 50)
-  tft.fillRoundRect(14, 38, 292, 50, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(14, 38, 292, 50, 6, 0xFD20);
-  font_draw_string(28, 45, "2048 数字消除", 0xFD20, COLOR_PANEL_BG, 1);
-  font_draw_string(28, 67, "经典益智滑屏合成，挑战 2048 巅峰", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  // 1. 卡片 0: 网络收音机 (Row 0, Col 0: x=14, y=36, w=140, h=48)
+  {
+    int16_t x = 14, y = 36, w = 140, h = 48;
+    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
+    tft.drawRoundRect(x, y, w, h, 6, COLOR_ACCENT_GREEN);
+    font_draw_string(x + 12, y + 7, "网络收音机", COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 1);
+    font_draw_string(x + 12, y + 26, "在线流媒体电台", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  }
 
-  // 卡片 2: 电子木鱼 (x: 14, y: 94, w: 292, h: 50)
-  tft.fillRoundRect(14, 94, 292, 50, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(14, 94, 292, 50, 6, COLOR_ACCENT_GREEN);
-  font_draw_string(28, 101, "电子木鱼 (功德+1)", COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 1);
-  font_draw_string(28, 123, "沉浸拟真音效，静心修行，自动积攒功德", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  // 2. 卡片 1: 空中传歌/书 (Row 0, Col 1: x=166, y=36, w=140, h=48)
+  {
+    int16_t x = 166, y = 36, w = 140, h = 48;
+    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
+    tft.drawRoundRect(x, y, w, h, 6, COLOR_ACCENT_CYAN);
+    font_draw_string(x + 12, y + 7, "空中传歌/书", COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
+    font_draw_string(x + 12, y + 26, "网页拖拽免拔卡", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  }
 
-  // 卡片 3: 蓝牙音箱模式 (x: 14, y: 150, w: 292, h: 50)
-  tft.fillRoundRect(14, 150, 292, 50, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(14, 150, 292, 50, 6, COLOR_ACCENT_CYAN);
-  font_draw_string(28, 157, "蓝牙音箱模式", COLOR_ACCENT_CYAN, COLOR_PANEL_BG, 1);
-  font_draw_string(28, 179, "手机无线串流，变身桌面随身音箱", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  // 3. 卡片 2: 蓝牙音箱 (Row 1, Col 0: x=14, y=89, w=140, h=48)
+  {
+    int16_t x = 14, y = 89, w = 140, h = 48;
+    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
+    tft.drawRoundRect(x, y, w, h, 6, 0x07FF);
+    font_draw_string(x + 12, y + 7, "蓝牙音箱", 0x07FF, COLOR_PANEL_BG, 1);
+    font_draw_string(x + 12, y + 26, "手机无线推歌", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  }
 
-  // 底部提示 (y: 206, h: 26)
-  tft.fillRoundRect(14, 206, 292, 26, 6, 0x10A2);
-  tft.drawRoundRect(14, 206, 292, 26, 6, COLOR_PANEL_BORDER);
-  font_draw_string_center(160, 211, "摆烂摸鱼，快乐至上", 0x92BB, 0x10A2, 1);
+  // 4. 卡片 3: 电子木鱼 (Row 1, Col 1: x=166, y=89, w=140, h=48)
+  {
+    int16_t x = 166, y = 89, w = 140, h = 48;
+    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
+    tft.drawRoundRect(x, y, w, h, 6, 0xFD20);
+    font_draw_string(x + 12, y + 7, "电子木鱼", 0xFD20, COLOR_PANEL_BG, 1);
+    font_draw_string(x + 12, y + 26, "功德+1 自动积攒", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  }
+
+  // 5. 卡片 4: 2048 数字消除 (Row 2, Col 0: x=14, y=142, w=140, h=48)
+  {
+    int16_t x = 14, y = 142, w = 140, h = 48;
+    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
+    tft.drawRoundRect(x, y, w, h, 6, 0xFD20);
+    font_draw_string(x + 12, y + 7, "2048 经典", 0xFD20, COLOR_PANEL_BG, 1);
+    font_draw_string(x + 12, y + 26, "滑屏数字消除", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  }
+
+  // 6. 卡片 5: 复古翻页钟 (Row 2, Col 1: x=166, y=142, w=140, h=48)
+  {
+    int16_t x = 166, y = 142, w = 140, h = 48;
+    tft.fillRoundRect(x, y, w, h, 6, COLOR_PANEL_BG);
+    tft.drawRoundRect(x, y, w, h, 6, 0x92BB);
+    font_draw_string(x + 12, y + 7, "复古翻页钟", 0x92BB, COLOR_PANEL_BG, 1);
+    font_draw_string(x + 12, y + 26, "拟物机械桌面摆件", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+  }
+
+  // 底部信息条 (y: 196, h: 34)
+  tft.fillRoundRect(14, 196, 292, 34, 6, 0x10A2);
+  tft.drawRoundRect(14, 196, 292, 34, 6, COLOR_PANEL_BORDER);
+  font_draw_string_center(160, 204, "摆烂摸鱼，快乐至上 · 极客玩物", 0x92BB, 0x10A2, 1);
 }
 
 void game_menu_enter() {
@@ -50,24 +86,42 @@ void game_menu_handle_touch(int16_t x, int16_t y) {
     return;
   }
 
-  // 2. 点击卡片 1: 2048 (y: 36..90)
-  if (y >= 36 && y <= 90 && x >= 14 && x <= 306) {
-    audio_test_beep(1500, 40);
-    ui_switch_to(UI_PAGE_GAME_2048);
-    return;
+  // 2. 第一行 (y: 36..86)
+  if (y >= 36 && y <= 86) {
+    if (x >= 14 && x <= 154) {
+      audio_test_beep(1500, 40);
+      ui_switch_to(UI_PAGE_WEB_RADIO);
+      return;
+    } else if (x >= 166 && x <= 306) {
+      audio_test_beep(1500, 40);
+      ui_switch_to(UI_PAGE_WEB_MANAGER);
+      return;
+    }
   }
 
-  // 3. 点击卡片 2: 电子木鱼 (y: 92..146)
-  if (y >= 92 && y <= 146 && x >= 14 && x <= 306) {
-    audio_test_beep(1500, 40);
-    ui_switch_to(UI_PAGE_MUYU);
-    return;
+  // 3. 第二行 (y: 89..139)
+  if (y >= 89 && y <= 139) {
+    if (x >= 14 && x <= 154) {
+      audio_test_beep(1800, 40);
+      ui_switch_to(UI_PAGE_BLUETOOTH_SINK);
+      return;
+    } else if (x >= 166 && x <= 306) {
+      audio_test_beep(1500, 40);
+      ui_switch_to(UI_PAGE_MUYU);
+      return;
+    }
   }
 
-  // 4. 点击卡片 3: 蓝牙音箱 (y: 148..202)
-  if (y >= 148 && y <= 202 && x >= 14 && x <= 306) {
-    audio_test_beep(1800, 40);
-    ui_switch_to(UI_PAGE_BLUETOOTH_SINK);
-    return;
+  // 4. 第三行 (y: 142..192)
+  if (y >= 142 && y <= 192) {
+    if (x >= 14 && x <= 154) {
+      audio_test_beep(1500, 40);
+      ui_switch_to(UI_PAGE_GAME_2048);
+      return;
+    } else if (x >= 166 && x <= 306) {
+      audio_test_beep(1600, 40);
+      ui_switch_to(UI_PAGE_LOCKSCREEN);
+      return;
+    }
   }
 }

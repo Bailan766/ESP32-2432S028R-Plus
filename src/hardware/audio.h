@@ -2,6 +2,9 @@
 #include <Arduino.h>
 #include "config.h"
 
+class AudioOutput;
+AudioOutput* audio_get_output();
+
 void audio_init();
 void audio_set_volume(uint8_t volume_percent);
 uint8_t audio_get_volume();
