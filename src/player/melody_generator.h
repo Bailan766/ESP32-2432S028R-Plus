@@ -20,7 +20,7 @@ public:
   virtual bool isRunning() override;
 
   uint16_t getCurrentFreq() const { return m_currentFreq; }
-  uint32_t getElapsedSec() const { return (uint32_t)(m_elapsedSamples / 44100ULL); }
+  uint32_t getElapsedSec() const { return (uint32_t)(m_elapsedSamples / 22050ULL); }
 
 private:
   const Note* m_notes;

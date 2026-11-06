@@ -206,7 +206,11 @@ void home_handle_touch(int16_t x, int16_t y) {
 
   // 2. 上位 Hero 播放控制舱 (y: 32 ~ 92)
   if (y >= 32 && y <= 92) {
-    audio_test_beep(1200, 30);
+    if (player_get_state() != STATE_PLAYING) {
+      player_play();
+    } else {
+      audio_test_beep(1200, 30);
+    }
     ui_switch_to(UI_PAGE_PLAYER);
     return;
   }

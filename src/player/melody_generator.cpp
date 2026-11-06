@@ -36,7 +36,7 @@ bool AudioGeneratorMelody::begin(const Note* notes, uint16_t count, AudioOutput*
   m_currentFreq = 0;
 
   this->output = out;
-  if (!output->SetRate(44100)) return false;
+  if (!output->SetRate(22050)) return false;
   if (!output->SetBitsPerSample(16)) return false;
   if (!output->SetChannels(2)) return false;
   if (!output->begin()) return false;
@@ -62,7 +62,8 @@ bool AudioGeneratorMelody::loop() {
   if (!running || !output) return false;
 
   int batch = 0;
-  while (batch < 64) {
+  // 每次尽可能充盈环形缓冲区 (最多推 512 个采样, 约 23ms 音频), 彻底消灭主循环 UI 导致的断流
+  while (batch < 512) {
     if (m_noteIdx >= m_noteCount) {
       if (m_shouldLoop) {
         m_noteIdx = 0;
@@ -78,20 +79,20 @@ bool AudioGeneratorMelody::loop() {
     memcpy_P(&curNote, &m_notes[m_noteIdx], sizeof(Note));
     m_currentFreq = curNote.freq;
 
-    // 44.1kHz 下当前音符所对应的总采样数
-    m_noteTotalSamples = ((uint32_t)curNote.duration * 44100UL) / 1000UL;
+    // 22.05kHz 下当前音符所对应的总采样数
+    m_noteTotalSamples = ((uint32_t)curNote.duration * 22050UL) / 1000UL;
     if (m_noteTotalSamples == 0) m_noteTotalSamples = 1;
 
     int16_t sampleVal = 0;
     if (curNote.freq > 0) {
-      // 尾部预留 6ms 连音断奏微缝隙，防止同音连续粘连并消除爆音
-      uint32_t gap = (m_noteTotalSamples > 300) ? 265 : (m_noteTotalSamples / 5);
+      // 尾部预留 6ms 连音断奏微缝隙 (132 samples @ 22050Hz)
+      uint32_t gap = (m_noteTotalSamples > 150) ? 132 : (m_noteTotalSamples / 5);
       if (m_sampleInNote < (m_noteTotalSamples - gap)) {
         uint32_t activeLen = m_noteTotalSamples - gap;
         // 起音 6ms 平滑淡入
-        uint32_t attack = (activeLen > 400) ? 265 : (activeLen / 4);
+        uint32_t attack = (activeLen > 200) ? 132 : (activeLen / 4);
         // 释音 6ms 平滑淡出
-        uint32_t release = (activeLen > 400) ? 265 : (activeLen / 4);
+        uint32_t release = (activeLen > 200) ? 132 : (activeLen / 4);
 
         float env = 1.0f;
         if (m_sampleInNote < attack) {
@@ -101,15 +102,15 @@ bool AudioGeneratorMelody::loop() {
         } else {
           // 仿电钢琴/八音盒自然声学指数微衰减
           float decayProgress = (float)(m_sampleInNote - attack) / (float)(activeLen - attack - release + 1);
-          env = 1.0f - 0.25f * decayProgress;
+          env = 1.0f - 0.22f * decayProgress;
         }
 
-        m_phaseStep = (2.0f * (float)M_PI * (float)curNote.freq) / 44100.0f;
+        m_phaseStep = (2.0f * (float)M_PI * (float)curNote.freq) / 22050.0f;
         // 谐波拟合音色：75% 基波正弦 + 20% 二次谐波 + 5% 三次谐波
         float wave = sinf(m_phase) + 0.25f * sinf(2.0f * m_phase) + 0.08f * sinf(3.0f * m_phase);
         wave *= 0.75f;
 
-        sampleVal = (int16_t)(wave * env * 14000.0f);
+        sampleVal = (int16_t)(wave * env * 28000.0f);
 
         m_phase += m_phaseStep;
         if (m_phase >= 2.0f * (float)M_PI) m_phase -= 2.0f * (float)M_PI;
@@ -123,7 +124,7 @@ bool AudioGeneratorMelody::loop() {
 
     int16_t s[2] = { sampleVal, sampleVal };
     if (!output->ConsumeSample(s)) {
-      // DMA 缓冲区满，让出 CPU
+      // 环形缓冲区满，让出 CPU
       return true;
     }
 

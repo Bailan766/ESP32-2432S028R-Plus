@@ -7,6 +7,10 @@
 #include "ui/font_cn.h"
 #include "weather.h"
 #include "config.h"
+#include "hardware/audio.h"
+#include "hardware/amplifier.h"
+#include "player/player.h"
+#include <driver/dac.h>
 
 static bool s_timeSynced = false;
 static unsigned long s_lastWifiCheck = 0;
@@ -160,7 +164,54 @@ static void handleSerialCommands() {
     cmd.trim();
     if (cmd.length() == 0) return;
 
-    if (cmd.equalsIgnoreCase("SCAN")) {
+    if (cmd.equalsIgnoreCase("BEEP") || cmd.equalsIgnoreCase("TEST")) {
+      Serial.println("[CMD] 播放测试音 1000Hz 500ms (GPIO4=LOW, GPIO26=DAC2)...");
+      audio_test_beep(1000, 500);
+      Serial.println("[CMD] 测试音完成");
+    } else if (cmd.equalsIgnoreCase("PLAY")) {
+      Serial.println("[CMD] 执行播放 player_play()...");
+      player_play();
+      Serial.printf("[CMD] 播放器状态: %s\n", player_state_to_string(player_get_state()));
+    } else if (cmd.equalsIgnoreCase("STOP")) {
+      Serial.println("[CMD] 执行停止 player_stop()...");
+      player_stop();
+    } else if (cmd.equalsIgnoreCase("NEXT")) {
+      Serial.println("[CMD] 执行下一曲 player_next()...");
+      player_next();
+    } else if (cmd.equalsIgnoreCase("PREV")) {
+      Serial.println("[CMD] 执行上一曲 player_prev()...");
+      player_prev();
+    } else if (cmd.startsWith("SONG:") || cmd.startsWith("song:")) {
+      int idx = cmd.substring(5).toInt();
+      Serial.printf("[CMD] 播放曲目 [%d]...\n", idx);
+      player_play_track(idx);
+    } else if (cmd.startsWith("VOL:") || cmd.startsWith("vol:")) {
+      int vol = cmd.substring(4).toInt();
+      audio_set_volume(vol);
+      Serial.printf("[CMD] 设置音量为 %d%%\n", audio_get_volume());
+    } else if (cmd.equalsIgnoreCase("AMP:LOW")) {
+      Serial.println("[CMD] 强制 GPIO4 = LOW (开启 8002 功放)...");
+      pinMode(AMP_ENABLE_PIN, OUTPUT);
+      digitalWrite(AMP_ENABLE_PIN, LOW);
+    } else if (cmd.equalsIgnoreCase("AMP:HIGH")) {
+      Serial.println("[CMD] 强制 GPIO4 = HIGH (关闭 8002 功放)...\n");
+      pinMode(AMP_ENABLE_PIN, OUTPUT);
+      digitalWrite(AMP_ENABLE_PIN, HIGH);
+    } else if (cmd.equalsIgnoreCase("TONE:HIGH")) {
+      Serial.println("[CMD] 测试反向极性: GPIO4 = HIGH 状态下蜂鸣 1000Hz 500ms...");
+      pinMode(AMP_ENABLE_PIN, OUTPUT);
+      digitalWrite(AMP_ENABLE_PIN, HIGH);
+      dac_output_enable(DAC_CHANNEL_2);
+      unsigned long st = millis();
+      while (millis() - st < 500) {
+        dac_output_voltage(DAC_CHANNEL_2, 128 + 45);
+        delayMicroseconds(500);
+        dac_output_voltage(DAC_CHANNEL_2, 128 - 45);
+        delayMicroseconds(500);
+      }
+      digitalWrite(AMP_ENABLE_PIN, LOW);
+      Serial.println("[CMD] 反向极性测试完成");
+    } else if (cmd.equalsIgnoreCase("SCAN")) {
       net_scan_and_print();
     } else if (cmd.equalsIgnoreCase("STATUS") || cmd.equalsIgnoreCase("WIFI?")) {
       Serial.println("==================================================");
