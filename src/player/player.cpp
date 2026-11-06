@@ -31,8 +31,16 @@ static void startCurrentTrack() {
   db_add_recent(track->id);
 
   if (track->isDemo) {
-    LOG_PLAYER("播放内置 Flash Demo WAV...");
-    if (audio_play_demo_wav()) {
+    LOG_PLAYER("播放内置 Demo 示范曲: [%s]...", track->title);
+    int songIdx = 0;
+    if (strstr(track->path, "mario") || strstr(track->title, "马里奥")) songIdx = 0;
+    else if (strstr(track->path, "tetris") || strstr(track->title, "俄罗斯方块")) songIdx = 1;
+    else if (strstr(track->path, "summer") || strstr(track->title, "夏天") || strstr(track->title, "菊次郎")) songIdx = 2;
+    else if (strstr(track->path, "canon") || strstr(track->title, "卡农")) songIdx = 3;
+    else if (strstr(track->path, "astronomia") || strstr(track->title, "抬棺") || strstr(track->title, "电音")) songIdx = 4;
+    else songIdx = track->id % DEMO_SONGS_COUNT;
+
+    if (audio_play_demo(songIdx)) {
       s_playerState = STATE_PLAYING;
       rgb_set_state(RGB_PLAYING);
     } else {
@@ -120,10 +128,8 @@ void player_prev() {
 }
 
 void player_seek(uint16_t seconds) {
-  // Not fully supported by ESP8266Audio without ID3 offset logic
-  // We just visually update it for now
   s_elapsedSeconds = constrain(seconds, 0, s_totalSeconds);
-  LOG_PLAYER("跳跃时间点: %u 秒 (底层暂未实现文件偏移)", s_elapsedSeconds);
+  LOG_PLAYER("跳跃时间点: %u 秒", s_elapsedSeconds);
 }
 
 void player_seek_offset(int16_t deltaSeconds) {
@@ -168,7 +174,9 @@ uint16_t player_get_total_seconds() {
 }
 
 uint16_t player_get_current_note_freq() {
-  return random(100, 2000); // Fake frequency for UI visualizer
+  uint16_t f = audio_get_current_freq();
+  if (f > 0) return f;
+  return random(100, 2000);
 }
 
 void player_update() {
@@ -177,7 +185,13 @@ void player_update() {
   static unsigned long s_lastBgRgb = 0;
   if (millis() - s_lastBgRgb >= 70) {
     s_lastBgRgb = millis();
-    rgb_beat_pulse(random(80, 220), random(150, 1500));
+    uint16_t f = audio_get_current_freq();
+    if (f > 0) {
+      uint8_t bright = map(constrain(f, 200, 1600), 200, 1600, 120, 255);
+      rgb_beat_pulse(bright, f);
+    } else {
+      rgb_beat_pulse(random(80, 220), random(150, 1500));
+    }
   }
 
   // 1. 每秒更新播放时间
@@ -185,10 +199,14 @@ void player_update() {
     s_lastSecondTimer += 1000;
     if (s_elapsedSeconds < s_totalSeconds) {
       s_elapsedSeconds++;
+    } else {
+      // 达到当前曲目指定播放时长，自动跳切下一首
+      player_next();
+      return;
     }
   }
 
-  // 2. 检查 MP3 底层是否播放完毕
+  // 2. 检查 MP3 / 底层是否播放完毕
   if (!audio_is_playing()) {
     s_playerState = STATE_FINISHED;
     player_next();
