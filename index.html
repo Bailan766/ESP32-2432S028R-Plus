@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>CYD Plus · 固件在线烧录工具</title>
+<title>CYD Plus · 固件在线烧录中心</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
 
 <!-- Three.js (Local first, fallback to CDN) -->
@@ -19,24 +19,26 @@
 
 <style>
   :root {
-    --bg-base: #090a0f;
-    --card-bg: rgba(18, 20, 29, 0.7);
-    --border: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(255, 255, 255, 0.2);
-    --accent: #2563eb;
-    --accent-hover: #1d4ed8;
-    --green: #10b981;
-    --text-main: #f3f4f6;
-    --text-muted: #9ca3af;
-    --text-dim: #6b7280;
-    --font-mono: "SF Mono", Consolas, Menlo, Monaco, monospace;
+    --bg-base: #04060d;
+    --card-bg: rgba(10, 15, 29, 0.65);
+    --card-border: rgba(56, 189, 248, 0.16);
+    --card-border-hover: rgba(56, 189, 248, 0.5);
+    --cyan: #00f5ff;
+    --cyan-glow: rgba(0, 245, 255, 0.35);
+    --blue: #38bdf8;
+    --emerald: #10b981;
+    --emerald-glow: rgba(16, 185, 129, 0.35);
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
   body {
     background-color: var(--bg-base);
-    color: var(--text-main);
+    color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
     line-height: 1.6;
     min-height: 100vh;
@@ -45,11 +47,11 @@
     align-items: center;
     position: relative;
     overflow-x: hidden;
-    padding: 32px 16px 48px;
+    padding: 32px 16px 50px;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Three.js Background Canvas */
+  /* Three.js 3D Background Canvas */
   #bg-canvas {
     position: fixed;
     top: 0;
@@ -60,22 +62,61 @@
     pointer-events: none;
   }
 
+  /* Ambient Glows */
+  .ambient-glow-1 {
+    position: fixed;
+    top: -100px;
+    left: 15%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
+    z-index: 1;
+    pointer-events: none;
+    filter: blur(80px);
+  }
+
+  .ambient-glow-2 {
+    position: fixed;
+    bottom: -100px;
+    right: 10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, transparent 70%);
+    z-index: 1;
+    pointer-events: none;
+    filter: blur(80px);
+  }
+
   .container {
     width: 100%;
-    max-width: 760px;
+    max-width: 800px;
     position: relative;
     z-index: 10;
   }
 
-  /* Header */
+  /* Header Card */
   header {
     background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 24px;
-    margin-bottom: 20px;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 26px 30px;
+    margin-bottom: 22px;
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  header::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.6;
   }
 
   .title-row {
@@ -84,111 +125,154 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
   }
 
   .brand-title-wrap {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+  }
+
+  .chip-icon {
+    width: 38px;
+    height: 38px;
+    background: rgba(0, 245, 255, 0.1);
+    border: 1px solid rgba(0, 245, 255, 0.35);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 15px var(--cyan-glow);
   }
 
   h1 {
-    font-size: 19px;
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: 700;
     letter-spacing: -0.3px;
-    color: #fff;
+    background: linear-gradient(90deg, #ffffff 40%, var(--cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .badge {
+    font-family: var(--font-mono);
     font-size: 11px;
-    font-weight: 500;
-    padding: 3px 8px;
+    font-weight: 600;
+    padding: 3px 10px;
     border-radius: 6px;
-    background: rgba(16, 185, 129, 0.1);
-    color: var(--green);
-    border: 1px solid rgba(16, 185, 129, 0.25);
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
   }
 
   .subtitle {
     font-size: 13.5px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     line-height: 1.6;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
   }
 
   .meta-strip {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    font-size: 12px;
-    font-family: var(--font-mono);
-    color: var(--text-dim);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
     padding-top: 14px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  .meta-item { display: flex; gap: 6px; }
-  .meta-item strong { color: var(--text-muted); font-weight: 500; }
+  .meta-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 6px 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .meta-label {
+    font-size: 9px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .meta-val {
+    font-size: 11.5px;
+    font-family: var(--font-mono);
+    color: var(--cyan);
+    font-weight: 600;
+  }
 
   /* Notice Bar */
   .notice {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
-    padding: 14px 16px;
-    background: rgba(37, 99, 235, 0.08);
-    border: 1px solid rgba(37, 99, 235, 0.2);
-    border-radius: 12px;
-    font-size: 13px;
-    color: var(--text-main);
-    margin-bottom: 18px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  .notice-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
-
-  /* Cards */
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
+    padding: 14px 18px;
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.25);
     border-radius: 14px;
-    padding: 24px;
-    margin-bottom: 18px;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 20px;
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
 
+  .notice-icon { font-size: 18px; flex-shrink: 0; }
+
+  /* Interactive Cards */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .card:hover {
+    border-color: var(--card-border-hover);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.15);
+  }
+
   .card-title {
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
     color: #fff;
     margin-bottom: 16px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
   }
 
   .step-num {
-    width: 22px;
-    height: 22px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 245, 255, 0.12);
+    border: 1px solid var(--cyan);
+    border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
-    color: #fff;
-    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--cyan);
+    font-weight: 700;
   }
 
   /* Mode Selector */
   .mode-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 14px;
+    margin-bottom: 18px;
   }
 
   @media (max-width: 600px) {
@@ -196,33 +280,34 @@
   }
 
   .mode-card {
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px 16px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s;
     display: flex;
     gap: 12px;
   }
 
   .mode-card:hover {
-    border-color: var(--border-hover);
-    background: rgba(255, 255, 255, 0.03);
+    border-color: var(--cyan);
+    background: rgba(0, 245, 255, 0.04);
   }
 
   .mode-card.active {
-    border-color: var(--accent);
-    background: rgba(37, 99, 235, 0.08);
+    border-color: var(--cyan);
+    background: rgba(0, 245, 255, 0.08);
+    box-shadow: 0 0 16px rgba(0, 245, 255, 0.15);
   }
 
   .mode-card input {
-    accent-color: var(--accent);
+    accent-color: var(--cyan);
     margin-top: 3px;
   }
 
   .mode-info h4 {
-    font-size: 13.5px;
+    font-size: 14px;
     font-weight: 600;
     color: #fff;
     margin-bottom: 2px;
@@ -230,17 +315,18 @@
 
   .mode-info p {
     font-size: 12px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
 
   /* Install Action Box */
   .install-box {
     text-align: center;
-    padding: 32px 20px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px dashed var(--border);
-    border-radius: 10px;
-    margin-top: 14px;
+    padding: 34px 20px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px dashed rgba(56, 189, 248, 0.35);
+    border-radius: 14px;
+    margin-top: 16px;
+    box-shadow: inset 0 0 20px rgba(0, 245, 255, 0.03);
   }
 
   esp-web-install-button {
@@ -251,77 +337,87 @@
 
   .custom-flash-btn {
     cursor: pointer;
-    background: #10b981;
+    background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%);
     color: #ffffff;
-    padding: 13px 32px;
-    border: none;
-    border-radius: 8px;
-    font-size: 14.5px;
-    font-weight: 600;
+    padding: 14px 38px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    transition: 0.15s;
+    box-shadow: 0 4px 25px rgba(16, 185, 129, 0.4);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .custom-flash-btn:hover {
-    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 30px rgba(16, 185, 129, 0.6), 0 0 20px var(--cyan-glow);
   }
 
   .install-tip {
     font-size: 12px;
-    color: var(--text-dim);
+    font-family: var(--font-mono);
+    color: var(--text-muted);
     margin-top: 14px;
   }
 
   /* FAQ */
   .faq-item {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
   }
-  .faq-item:last-child { border-bottom: none; }
 
   .faq-q {
     font-size: 13.5px;
     font-weight: 600;
-    color: #fff;
-    margin-bottom: 4px;
+    color: var(--cyan);
+    margin-bottom: 6px;
   }
 
   .faq-a {
-    font-size: 13px;
-    color: var(--text-muted);
+    font-size: 12.5px;
+    color: var(--text-secondary);
     line-height: 1.6;
   }
 
   footer {
     text-align: center;
     font-size: 12px;
-    color: var(--text-dim);
+    font-family: var(--font-mono);
+    color: var(--text-muted);
     margin-top: 24px;
     padding-top: 16px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  footer a { color: var(--text-muted); text-decoration: none; }
-  footer a:hover { color: #fff; text-decoration: underline; }
+  footer a { color: var(--cyan); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
 
   #unsupported-alert {
     display: none;
     padding: 14px 18px;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.25);
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
     color: #fca5a5;
-    border-radius: 10px;
-    margin-bottom: 18px;
+    border-radius: 12px;
+    margin-bottom: 20px;
     font-size: 13px;
   }
 </style>
 </head>
 <body>
 
-<!-- Three.js Subtle Dark Interactive 3D Mesh -->
+<!-- Three.js 3D Hardware Microchip & Circuit Background -->
 <canvas id="bg-canvas"></canvas>
+
+<div class="ambient-glow-1"></div>
+<div class="ambient-glow-2"></div>
 
 <div class="container">
 
@@ -329,7 +425,10 @@
   <header>
     <div class="title-row">
       <div class="brand-title-wrap">
-        <h1>CYD Plus 网页刷机工具</h1>
+        <div class="chip-icon">⚡</div>
+        <div>
+          <h1>CYD Plus 固件在线烧录中心</h1>
+        </div>
       </div>
       <span class="badge">v1.2.4</span>
     </div>
@@ -337,29 +436,41 @@
     <p class="subtitle">适用于 ESP32-2432S028R Plus 一体化触屏板。基于 Web Serial 串口协议，直接通过浏览器连接板子完成烧录。</p>
 
     <div class="meta-strip">
-      <div class="meta-item"><span>主控:</span> <strong>ESP32 双核</strong></div>
-      <div class="meta-item"><span>屏幕:</span> <strong>ILI9341 SPI (240x320)</strong></div>
-      <div class="meta-item"><span>波特率:</span> <strong>921600</strong></div>
-      <div class="meta-item"><span>接口:</span> <strong>Type-C USB-Serial</strong></div>
+      <div class="meta-card">
+        <span class="meta-label">HARDWARE ARCH</span>
+        <span class="meta-val">ESP32 Xtensa Dual-Core</span>
+      </div>
+      <div class="meta-card">
+        <span class="meta-label">SERIAL SPEED</span>
+        <span class="meta-val">921600 Baud High-Speed</span>
+      </div>
+      <div class="meta-card">
+        <span class="meta-label">TFT CONTROLLER</span>
+        <span class="meta-val">ILI9341 SPI (240x320)</span>
+      </div>
+      <div class="meta-card">
+        <span class="meta-label">INTERFACE</span>
+        <span class="meta-val">CH340 / CP2102 Serial</span>
+      </div>
     </div>
   </header>
 
   <div id="unsupported-alert">
-    ⚠️ 您的当前浏览器不支持 Web Serial 串口通讯。请使用 <strong>Google Chrome</strong> 或 <strong>Microsoft Edge</strong> 桌面版打开此页面。
+    ⚠️ 您的当前浏览器未启用 Web Serial 串口通讯接口。请使用 <strong>Google Chrome</strong> 或 <strong>Microsoft Edge</strong> 桌面版访问以直接调用物理串口。
   </div>
 
   <div class="notice">
-    <div class="notice-icon">💡</div>
+    <div class="notice-icon">🔌</div>
     <div>
-      <strong>准备工作</strong>：请使用具有数据传输能力的 <strong>Type-C 数据线</strong> 连接开发板与电脑 USB 口（若提示找不到设备，请检查是否误用了纯充电线）。
+      <strong>硬件连接</strong>：请使用具备数据通讯能力的 <strong>Type-C 数据线</strong> 将 CYD 黄板连接至电脑 USB 口（若串口弹窗未显示设备，请检查是否误用了纯充电线）。
     </div>
   </div>
 
   <!-- Step 1 Card -->
   <div class="card">
     <div class="card-title">
-      <span class="step-num">1</span>
-      <span>固件烧录模式</span>
+      <span class="step-num">01</span>
+      <span>固件烧录模式选择</span>
     </div>
 
     <div class="mode-grid">
@@ -367,14 +478,14 @@
         <input type="radio" name="firmware_type" value="full" checked>
         <div class="mode-info">
           <h4>完整固件安装 (推荐)</h4>
-          <p>烧录 Bootloader、分区表与应用程序。不覆盖 Wi-Fi 与屏幕校准配置。</p>
+          <p>刷入 Bootloader、分区表与主程序。自动保留 NVS 配置与触控校准。</p>
         </div>
       </label>
       <label class="mode-card" id="mode-card-update" onclick="selectManifest('manifest_update.json', 'update')">
         <input type="radio" name="firmware_type" value="update">
         <div class="mode-info">
           <h4>增量更新 (仅 App)</h4>
-          <p>仅烧录 0x10000 应用程序段，适用于已有旧版系统时快速升级。</p>
+          <p>仅烧录 0x10000 应用程序段，极速更新，不覆盖引导结构。</p>
         </div>
       </label>
     </div>
@@ -382,25 +493,25 @@
     <div class="install-box">
       <esp-web-install-button id="installer" manifest="manifest.json">
         <button slot="activate" class="custom-flash-btn">
-          <span>⚡ 连接设备并开始烧录</span>
+          <span>⚡ 启动硬件连接并烧录固件</span>
         </button>
         <span slot="unsupported">当前浏览器不支持 Web Serial，请使用 Chrome 或 Edge</span>
         <span slot="not-allowed">安全限制：网页刷机必须在 HTTPS 域名或 localhost 下运行</span>
       </esp-web-install-button>
-      <p class="install-tip">点击上方按钮后，在弹出的串口列表中选中带有 <strong>CH340</strong> 或 <strong>USB-Serial</strong> 的设备即可。</p>
+      <p class="install-tip">点击上方按钮后，请在浏览器端口弹窗中选择带有 <strong>CH340</strong> 或 <strong>USB-Serial</strong> 的端口。</p>
     </div>
   </div>
 
   <!-- Step 2 FAQ Card -->
   <div class="card">
     <div class="card-title">
-      <span class="step-num">2</span>
-      <span>常见问题排查 (FAQ)</span>
+      <span class="step-num">02</span>
+      <span>硬件排障指引 (FAQ)</span>
     </div>
 
     <div class="faq-item">
-      <div class="faq-q">Q: 弹出的串口列表中没有出现板子？</div>
-      <div class="faq-a">1) 请确认数据线具备数据传输能力，非纯充电线；<br>2) 电脑需安装 CH340 虚拟串口驱动（通常 Win10/11 联网会自动安装）。</div>
+      <div class="faq-q">Q: 弹出的串口列表中未显示板子端口？</div>
+      <div class="faq-a">1) 确保连接线是带数据传输能力的通讯线（非纯充电线）；<br>2) 电脑需安装 CH340 虚拟串口驱动（通常 Windows 10/11 联网会自动安装）。</div>
     </div>
 
     <div class="faq-item">
@@ -409,8 +520,8 @@
     </div>
 
     <div class="faq-item">
-      <div class="faq-q">Q: 烧录完成后如何使用？</div>
-      <div class="faq-a">烧录达到 100% 后，芯片会自动复位并点亮屏幕进入系统。插入 FAT32 格式 TF 卡并拷入 MP3 即可正常使用。</div>
+      <div class="faq-q">Q: 烧录完成后如何验证？</div>
+      <div class="faq-a">烧录达到 100% 后，芯片会自动软复位，2 秒内屏幕即亮起播放器主控界面。插上 FAT32 格式 TF 卡拷入 MP3 即可开始畅听。</div>
     </div>
   </div>
 
@@ -420,7 +531,7 @@
 
 </div>
 
-<!-- Three.js Subtle Dark Interactive 3D Mesh -->
+<!-- Three.js 3D Microchip & Wave Scene -->
 <script>
 function selectManifest(manifestFile, type) {
   var installer = document.getElementById('installer');
@@ -435,56 +546,99 @@ if (!('serial' in navigator)) {
   document.getElementById('unsupported-alert').style.display = 'block';
 }
 
-(function initSubtle3D() {
+(function initThreeScene() {
   if (typeof THREE === 'undefined') return;
 
   var canvas = document.getElementById('bg-canvas');
   var scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x090a0f, 0.0016);
+  scene.fog = new THREE.FogExp2(0x04060d, 0.002);
 
   var camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1500);
-  camera.position.set(0, 90, 360);
+  camera.position.set(0, 80, 360);
 
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-  // Dark fluid wave mesh
-  var rows = 45, cols = 45;
-  var count = rows * cols;
-  var positions = new Float32Array(count * 3);
+  // --- 1. 3D Floating Hardware Microchip ---
+  var chipGroup = new THREE.Group();
 
-  var i = 0;
-  for (var ix = 0; ix < cols; ix++) {
-    for (var iy = 0; iy < rows; iy++) {
-      positions[i * 3] = ix * 26 - (cols * 26) / 2;
-      positions[i * 3 + 1] = -120;
-      positions[i * 3 + 2] = iy * 26 - (rows * 26) / 2;
-      i++;
+  var chipBaseGeo = new THREE.BoxGeometry(85, 7, 85);
+  var chipBaseMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+  var chipBase = new THREE.Mesh(chipBaseGeo, chipBaseMat);
+  chipGroup.add(chipBase);
+
+  var edgesGeo = new THREE.EdgesGeometry(chipBaseGeo);
+  var edgesMat = new THREE.LineBasicMaterial({ color: 0x00f5ff });
+  var chipEdges = new THREE.LineSegments(edgesGeo, edgesMat);
+  chipGroup.add(chipEdges);
+
+  var canGeo = new THREE.BoxGeometry(60, 4, 60);
+  var canMat = new THREE.MeshBasicMaterial({
+    color: 0x1e293b,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.5
+  });
+  var canMesh = new THREE.Mesh(canGeo, canMat);
+  canMesh.position.y = 5;
+  chipGroup.add(canMesh);
+
+  var ringGeo = new THREE.TorusGeometry(80, 0.8, 16, 80);
+  var ringMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.35
+  });
+  var signalRing = new THREE.Mesh(ringGeo, ringMat);
+  signalRing.rotation.x = Math.PI / 2;
+  chipGroup.add(signalRing);
+
+  var ledGeo = new THREE.SphereGeometry(3, 16, 16);
+  var ledMat = new THREE.MeshBasicMaterial({ color: 0x00f5ff });
+  var statusLed = new THREE.Mesh(ledGeo, ledMat);
+  statusLed.position.set(28, 7, -28);
+  chipGroup.add(statusLed);
+
+  chipGroup.position.set(0, 30, -70);
+  scene.add(chipGroup);
+
+  // --- 2. Wave Grid ---
+  var waveCols = 45, waveRows = 45;
+  var waveCount = waveCols * waveRows;
+  var wavePositions = new Float32Array(waveCount * 3);
+
+  var p = 0;
+  for (var wx = 0; wx < waveCols; wx++) {
+    for (var wy = 0; wy < waveRows; wy++) {
+      wavePositions[p * 3] = wx * 28 - (waveCols * 28) / 2;
+      wavePositions[p * 3 + 1] = -140;
+      wavePositions[p * 3 + 2] = wy * 28 - (waveRows * 28) / 2;
+      p++;
     }
   }
 
-  var geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  var waveGeo = new THREE.BufferGeometry();
+  waveGeo.setAttribute('position', new THREE.BufferAttribute(wavePositions, 3));
 
-  var material = new THREE.PointsMaterial({
-    color: 0x3b82f6,
+  var waveMat = new THREE.PointsMaterial({
+    color: 0x00f5ff,
     size: 2.2,
     transparent: true,
-    opacity: 0.35,
+    opacity: 0.4,
     blending: THREE.AdditiveBlending
   });
-
-  var particles = new THREE.Points(geometry, material);
-  scene.add(particles);
+  var waveMesh = new THREE.Points(waveGeo, waveMat);
+  scene.add(waveMesh);
 
   var mouseX = 0, mouseY = 0;
   var windowHalfX = window.innerWidth / 2;
   var windowHalfY = window.innerHeight / 2;
 
   document.addEventListener('mousemove', function(e) {
-    mouseX = (e.clientX - windowHalfX) * 0.08;
-    mouseY = (e.clientY - windowHalfY) * 0.08;
+    mouseX = (e.clientX - windowHalfX) * 0.1;
+    mouseY = (e.clientY - windowHalfY) * 0.1;
   });
 
   window.addEventListener('resize', function() {
@@ -499,21 +653,27 @@ if (!('serial' in navigator)) {
 
   function animate() {
     requestAnimationFrame(animate);
-    var t = clock.getElapsedTime() * 0.8;
+    var t = clock.getElapsedTime();
 
-    var pos = geometry.attributes.position.array;
+    chipGroup.rotation.y = t * 0.2;
+    signalRing.rotation.z = t * 0.35;
+
+    var ledScale = 1 + Math.sin(t * 6) * 0.4;
+    statusLed.scale.set(ledScale, ledScale, ledScale);
+
+    var posArray = waveGeo.attributes.position.array;
     var idx = 0;
-    for (var ix = 0; ix < cols; ix++) {
-      for (var iy = 0; iy < rows; iy++) {
-        pos[idx * 3 + 1] = (Math.sin((ix + t) * 0.3) * 14) + (Math.sin((iy + t) * 0.4) * 14) - 120;
+    for (var ix = 0; ix < waveCols; ix++) {
+      for (var iy = 0; iy < waveRows; iy++) {
+        posArray[idx * 3 + 1] = (Math.sin((ix + t * 2) * 0.3) * 14) + (Math.sin((iy + t * 1.5) * 0.4) * 14) - 130;
         idx++;
       }
     }
-    geometry.attributes.position.needsUpdate = true;
+    waveGeo.attributes.position.needsUpdate = true;
 
-    camera.position.x += (mouseX - camera.position.x) * 0.03;
-    camera.position.y += (-mouseY + 80 - camera.position.y) * 0.03;
-    camera.lookAt(0, -30, 0);
+    camera.position.x += (mouseX - camera.position.x) * 0.04;
+    camera.position.y += (-mouseY + 60 - camera.position.y) * 0.04;
+    camera.lookAt(0, 10, 0);
 
     renderer.render(scene, camera);
   }
