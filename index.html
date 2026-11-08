@@ -1,266 +1,759 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CYD Plus 摆烂播放器 - 网页一键刷机工具</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%3E<text y=%2226%22 font-size=%2226%22>📻</text></svg>">
-  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
-  <style>
-    :root {
-      --bg: #0d1117;
-      --card-bg: #161b22;
-      --border: #30363d;
-      --text: #c9d1d9;
-      --text-muted: #8b949e;
-      --accent: #58a6ff;
-      --green: #3fb950;
-      --green-bg: rgba(46, 160, 67, 0.15);
-      --red: #f85149;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.6;
-      padding: 30px 20px;
-      display: flex;
-      justify-content: center;
-    }
-    .container {
-      width: 100%;
-      max-width: 720px;
-    }
-    header {
-      margin-bottom: 24px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--border);
-    }
-    .title-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 8px;
-    }
-    h1 {
-      font-size: 22px;
-      font-weight: 700;
-      color: #f0f6fc;
-      letter-spacing: -0.5px;
-    }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      font-size: 12px;
-      font-weight: 600;
-      border-radius: 20px;
-      background: var(--green-bg);
-      color: var(--green);
-      border: 1px solid rgba(63, 185, 80, 0.3);
-    }
-    .subtitle {
-      font-size: 14px;
-      color: var(--text-muted);
-    }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-    .card-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: #f0f6fc;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .step-num {
-      width: 22px;
-      height: 22px;
-      background: #21262d;
-      border: 1px solid var(--border);
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      color: var(--accent);
-      font-weight: bold;
-    }
-    .mode-options {
-      display: grid;
-      gap: 12px;
-    }
-    .mode-label {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 12px 14px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      cursor: pointer;
-      background: #0d1117;
-      transition: all 0.15s ease;
-    }
-    .mode-label:hover {
-      border-color: #58a6ff;
-      background: rgba(88, 166, 255, 0.04);
-    }
-    .mode-label input[type="radio"] {
-      margin-top: 4px;
-      accent-color: #58a6ff;
-    }
-    .mode-text h3 {
-      font-size: 14px;
-      color: #f0f6fc;
-      font-weight: 600;
-      margin-bottom: 2px;
-    }
-    .mode-text p {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-    .install-box {
-      text-align: center;
-      padding: 24px;
-      background: #0d1117;
-      border: 1px dashed var(--border);
-      border-radius: 6px;
-      margin-top: 14px;
-    }
-    esp-web-install-button {
-      --esp-tools-button-color: #238636;
-      --esp-tools-button-text-color: #fff;
-      --esp-tools-button-border-radius: 6px;
-    }
-    .install-tip {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 12px;
-    }
-    .notice {
-      display: flex;
-      gap: 10px;
-      padding: 12px;
-      background: rgba(88, 166, 255, 0.08);
-      border: 1px solid rgba(88, 166, 255, 0.2);
-      border-radius: 6px;
-      font-size: 13px;
-      color: #c9d1d9;
-      margin-bottom: 16px;
-    }
-    .notice-icon { font-size: 16px; flex-shrink: 0; }
-    .faq-item {
-      margin-bottom: 12px;
-    }
-    .faq-q {
-      font-size: 13px;
-      font-weight: 600;
-      color: #f0f6fc;
-      margin-bottom: 4px;
-    }
-    .faq-a {
-      font-size: 12px;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-    footer {
-      text-align: center;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 30px;
-      padding-top: 15px;
-      border-top: 1px solid var(--border);
-    }
-    footer a { color: var(--accent); text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
-    #unsupported-alert {
-      display: none;
-      padding: 14px;
-      background: rgba(248, 81, 73, 0.1);
-      border: 1px solid rgba(248, 81, 73, 0.4);
-      color: #ff7b72;
-      border-radius: 6px;
-      margin-bottom: 16px;
-      font-size: 13px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CYD Plus 摆烂播放器 · 赛博在线固件烧录终端 // ESP32 NEXUS</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+
+<!-- Three.js (Local first, fallback to CDN) -->
+<script src="./three.min.js"></script>
+<script>
+  if (typeof THREE === 'undefined') {
+    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+  }
+</script>
+
+<!-- Official ESP Web Tools -->
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+
+<style>
+  :root {
+    --bg-base: #070a14;
+    --bg-surface: rgba(11, 18, 36, 0.72);
+    --border-glow: rgba(0, 240, 255, 0.28);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --cyan: #00f0ff;
+    --cyan-glow: rgba(0, 240, 255, 0.4);
+    --amber: #ffb703;
+    --amber-glow: rgba(255, 183, 3, 0.4);
+    --green: #00ff88;
+    --green-glow: rgba(0, 255, 136, 0.4);
+    --red: #ff3366;
+    --text-primary: #f0f6fc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --font-mono: "JetBrains Mono", Consolas, "Fira Code", monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    overflow-x: hidden;
+    padding: 24px 16px 40px;
+  }
+
+  /* 3D WebGL Canvas Layer */
+  #bg-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* Cyber Scanline Grid Overlay */
+  .cyber-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 15%, rgba(0, 240, 255, 0.07) 0%, transparent 65%),
+                linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+    background-size: 100% 100%, 36px 36px, 36px 36px;
+  }
+
+  .cyber-overlay::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.35;
+    animation: scanline 8s linear infinite;
+  }
+
+  @keyframes scanline {
+    0% { top: -10px; opacity: 0; }
+    20% { opacity: 0.4; }
+    80% { opacity: 0.4; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* HUD Corner Brackets */
+  .hud-bracket {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: var(--cyan);
+    border-style: solid;
+    pointer-events: none;
+    opacity: 0.8;
+  }
+  .hud-bracket.tl { top: 6px; left: 6px; border-width: 2px 0 0 2px; }
+  .hud-bracket.tr { top: 6px; right: 6px; border-width: 2px 2px 0 0; }
+  .hud-bracket.bl { bottom: 6px; left: 6px; border-width: 0 0 2px 2px; }
+  .hud-bracket.br { bottom: 6px; right: 6px; border-width: 0 2px 2px 0; }
+
+  .container {
+    width: 100%;
+    max-width: 820px;
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Header Section */
+  header {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glow);
+    border-radius: 16px;
+    padding: 22px 26px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 25px rgba(0, 240, 255, 0.05);
+    position: relative;
+  }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .brand-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .chip-logo {
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 240, 255, 0.12);
+    border: 1px solid var(--cyan);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 15px var(--cyan-glow);
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #ffffff, var(--cyan) 80%, var(--green) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: rgba(0, 255, 136, 0.12);
+    color: var(--green);
+    border: 1px solid rgba(0, 255, 136, 0.35);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+
+  /* Telemetry Grid */
+  .telemetry-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .tele-item {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tele-label {
+    font-size: 9px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .tele-val {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--cyan);
+    font-weight: 600;
+  }
+
+  /* Notice Bar */
+  .notice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    border-radius: 12px;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 18px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 15px rgba(0, 240, 255, 0.08);
+  }
+
+  .notice-icon { font-size: 20px; flex-shrink: 0; }
+
+  /* Interactive Cards */
+  .card {
+    position: relative;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glow);
+    border-radius: 16px;
+    padding: 22px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .card:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 240, 255, 0.15);
+  }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .step-num {
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid var(--cyan);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--cyan);
+    font-weight: 800;
+  }
+
+  /* Mode Selector */
+  .mode-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 600px) {
+    .mode-grid { grid-template-columns: 1fr; }
+  }
+
+  .mode-card {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    gap: 10px;
+  }
+
+  .mode-card:hover {
+    border-color: var(--cyan);
+    background: rgba(0, 240, 255, 0.05);
+  }
+
+  .mode-card.active {
+    border-color: var(--cyan);
+    background: rgba(0, 240, 255, 0.1);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+  }
+
+  .mode-card input {
+    accent-color: var(--cyan);
+    margin-top: 3px;
+  }
+
+  .mode-info h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .mode-info p {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* Install Action Box */
+  .install-box {
+    text-align: center;
+    padding: 28px 20px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px dashed rgba(0, 240, 255, 0.35);
+    border-radius: 12px;
+    margin-top: 14px;
+    box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.04);
+  }
+
+  esp-web-install-button {
+    --esp-tools-button-color: #00ff88;
+    --esp-tools-button-text-color: #04100c;
+    --esp-tools-button-border-radius: 8px;
+  }
+
+  .custom-flash-btn {
+    cursor: pointer;
+    background: linear-gradient(135deg, #00f0ff 0%, #00ff88 100%);
+    color: #04121a;
+    padding: 14px 36px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 25px rgba(0, 255, 136, 0.4);
+    transition: all 0.25s;
+  }
+
+  .custom-flash-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 30px rgba(0, 255, 136, 0.6), 0 0 20px var(--cyan);
+  }
+
+  .install-tip {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    margin-top: 14px;
+  }
+
+  /* Collapsible FAQ Panels */
+  .faq-item {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+  }
+
+  .faq-q {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cyan);
+    margin-bottom: 6px;
+  }
+
+  .faq-a {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  footer {
+    text-align: center;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  footer a { color: var(--cyan); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  #unsupported-alert {
+    display: none;
+    padding: 14px 18px;
+    background: rgba(255, 51, 102, 0.12);
+    border: 1px solid rgba(255, 51, 102, 0.4);
+    color: #ff6b8b;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    font-size: 13px;
+  }
+</style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="title-row">
-        <h1>CYD Plus 摆烂播放器 网页刷机工具</h1>
-        <span class="badge">v1.2.3</span>
-      </div>
-      <p class="subtitle">适用于 ESP32-2432S028R Plus 一体化触屏板。基于 Web Serial 协议，打开网页直接烧录。</p>
-    </header>
 
-    <div id="unsupported-alert">
-      ⚠️ 你的浏览器不支持 Web Serial 串口通讯。请使用 <strong>Google Chrome</strong>、<strong>Microsoft Edge</strong> 或 <strong>Opera</strong> 桌面版打开此页面。
+<!-- Three.js 3D Hardware Canvas -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- Cyber Overlay -->
+<div class="cyber-overlay"></div>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="hud-bracket tl"></div>
+    <div class="hud-bracket tr"></div>
+    <div class="hud-bracket bl"></div>
+    <div class="hud-bracket br"></div>
+
+    <div class="title-row">
+      <div class="brand-title-wrap">
+        <div class="chip-logo">⚡</div>
+        <div>
+          <h1>CYD Plus 赛博网页刷机终端</h1>
+        </div>
+      </div>
+      <span class="badge">v1.2.4 PRODUCTION</span>
     </div>
 
-    <div class="notice">
-      <div class="notice-icon">🔌</div>
-      <div>
-        <strong>准备工作</strong>：请用 <strong>Type-C 数据线</strong> 将板子连接至电脑 USB 口。<br>
-        （若之前只能充电无串口，说明是纯充电线，需换成能传输数据的数据线）。
+    <p class="subtitle">适用于 ESP32-2432S028R Plus 一体化触屏板。基于 Web Serial 串口通讯协议，免装驱动，打开网页极速刷写。</p>
+
+    <div class="telemetry-bar">
+      <div class="tele-item">
+        <span class="tele-label">HARDWARE ARCH</span>
+        <span class="tele-val">ESP32 Xtensa Dual-Core</span>
+      </div>
+      <div class="tele-item">
+        <span class="tele-label">BAUD RATE</span>
+        <span class="tele-val">921600 HIGH-SPEED</span>
+      </div>
+      <div class="tele-item">
+        <span class="tele-label">DISPLAY CONTROLLER</span>
+        <span class="tele-val">ILI9341 SPI (240x320)</span>
+      </div>
+      <div class="tele-item">
+        <span class="tele-label">INTERFACE</span>
+        <span class="tele-val">CH340 / CP2102 Serial</span>
       </div>
     </div>
+  </header>
 
-    <div class="card">
-      <div class="card-title">
-        <span class="step-num">1</span>
-        <span>一键刷入最新固件</span>
-      </div>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-        自动烧录完整引导（Bootloader）、分区表与 v1.2.3 应用程序。安装时若<strong>不勾选擦除（Erase）</strong>将自动保留您的 Wi-Fi 配置与触控校准。
-      </p>
-
-      <div class="install-box">
-        <esp-web-install-button id="installer" manifest="manifest.json">
-          <button slot="activate" style="cursor:pointer; background-color:#238636; color:#ffffff; padding:14px 32px; border:none; border-radius:6px; font-size:16px; font-weight:600; display:inline-flex; align-items:center; gap:8px;">
-            <span>⚡ 开始连接并刷入 (v1.2.3 正式版)</span>
-          </button>
-          <span slot="unsupported">当前浏览器不支持 Web Serial，请换用 Chrome 或 Edge</span>
-          <span slot="not-allowed">出于安全限制，网页刷机必须在 HTTPS 域名或 http://localhost 下运行</span>
-        </esp-web-install-button>
-        <p class="install-tip">点击按钮后，在浏览器弹窗中选中带有 <strong>CH340</strong> 或 <strong>USB-Serial</strong> 的端口即可自动开始。</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">
-        <span>💡 常见排查指引 (FAQ)</span>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">Q1: 点击后弹窗里找不到板子的串口？</div>
-        <div class="faq-a">1) 确保连接线是「数据线」，许多手机附赠的线是纯充电线，无 D+/D- 信号线。<br>2) 电脑需安装 CH340 虚拟串口驱动（通常 Windows 10/11 联网会自动装好）。</div>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">Q2: 烧录时提示 Connecting 超时，或串口无限报 invalid header / RTCWDT_RTC_RESET 重启？</div>
-        <div class="faq-a">这是因为引导区为空或串口处于复位死循环中。<strong>解决方法极度简单</strong>：<br>按住开发板背面的 <strong>BOOT 按键不要松开</strong>，用指甲按一下旁边的 <strong>RST/EN 复位按键</strong>，再松开 BOOT 键。此时板子将稳定停留在下载等待模式，关闭正在占用串口的串口助手/监视器，刷新本网页重新点击「开始连接并刷入」即可 100% 修复！</div>
-      </div>
-      <div class="faq-item">
-        <div class="faq-q">Q3: 刷完之后怎么用？</div>
-        <div class="faq-a">烧录进度到达 100% 后，ESP32 会自动软复位进入系统。首次开机将在 2.5 秒内自动展示启动画面并进入主屏。插上 TF 卡（格式化为 FAT32）并拷入 MP3 即可开听。</div>
-      </div>
-    </div>
-
-    <footer>
-      <p>开源项目：<a href="https://github.com/Bailan766/ESP32-2432S028R-Plus" target="_blank">Bailan766 / ESP32-2432S028R-Plus</a> · 硬件平台: CYD Plus</p>
-    </footer>
+  <div id="unsupported-alert">
+    ⚠️ 您的当前浏览器未启用 Web Serial 串口通讯接口。请使用 <strong>Google Chrome</strong> 或 <strong>Microsoft Edge</strong> 桌面版访问以直接调用物理串口。
   </div>
 
-  <script>
-    if (!('serial' in navigator)) {
-      document.getElementById('unsupported-alert').style.display = 'block';
+  <div class="notice">
+    <div class="notice-icon">🔌</div>
+    <div>
+      <strong>硬件准备</strong>：请使用具备数据传输能力的 <strong>Type-C 数据线</strong> 将 CYD 黄板连接至电脑 USB 接口（若之前设备管理器无串口，请注意避开仅能充电的线缆）。
+    </div>
+  </div>
+
+  <!-- Step 1 Card -->
+  <div class="card">
+    <div class="hud-bracket tl"></div>
+    <div class="hud-bracket tr"></div>
+    <div class="hud-bracket bl"></div>
+    <div class="hud-bracket br"></div>
+
+    <div class="card-title">
+      <span class="step-num">01</span>
+      <span>固件烧录模式选择</span>
+    </div>
+
+    <div class="mode-grid">
+      <label class="mode-card active" id="mode-card-full" onclick="selectManifest('manifest.json', 'full')">
+        <input type="radio" name="firmware_type" value="full" checked>
+        <div class="mode-info">
+          <h4>🚀 完整固件烧录 (推荐)</h4>
+          <p>刷入 Bootloader、分区表与主程序。自动保留 NVS 配置与触控校准。</p>
+        </div>
+      </label>
+      <label class="mode-card" id="mode-card-update" onclick="selectManifest('manifest_update.json', 'update')">
+        <input type="radio" name="firmware_type" value="update">
+        <div class="mode-info">
+          <h4>⚡ 增量更新 (仅 App)</h4>
+          <p>仅烧录 0x10000 应用程序段，极速更新，不覆盖引导结构。</p>
+        </div>
+      </label>
+    </div>
+
+    <div class="install-box">
+      <esp-web-install-button id="installer" manifest="manifest.json">
+        <button slot="activate" class="custom-flash-btn">
+          <span>⚡ 启动硬件连接并烧录固件</span>
+        </button>
+        <span slot="unsupported">当前浏览器不支持 Web Serial，请使用 Chrome 或 Edge</span>
+        <span slot="not-allowed">安全策略要求：网页刷机必须在 HTTPS 域名或 localhost 下运行</span>
+      </esp-web-install-button>
+      <p class="install-tip">[PORT SCAN] 点击上方按钮后，请在浏览器端口弹窗中选择带有 <strong>CH340</strong> 或 <strong>USB-Serial</strong> 的设备。</p>
+    </div>
+  </div>
+
+  <!-- Step 2 FAQ Card -->
+  <div class="card">
+    <div class="hud-bracket tl"></div>
+    <div class="hud-bracket tr"></div>
+    <div class="hud-bracket bl"></div>
+    <div class="hud-bracket br"></div>
+
+    <div class="card-title">
+      <span class="step-num">02</span>
+      <span>💡 硬件排障与极速自救 (FAQ)</span>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Q1: 点击后串口弹窗中未显示板子端口？</div>
+      <div class="faq-a">1) 确保连接线为带数据通讯的线缆（非纯充电线）。<br>2) 确保已安装 CH340 虚拟串口驱动（Windows 10/11 联网通常自动安装）。</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Q2: 提示 Connecting 超时，或串口无限报 invalid header / RTCWDT 复位？</div>
+      <div class="faq-a"><strong>100% 解决技巧</strong>：按住开发板背面的 <strong>BOOT 按键不要松开</strong>，用指甲轻点一下旁边的 <strong>RST/EN 按键</strong>，再松开 BOOT 键。此时板子将强制锁死在 Bootloader 烧录模式，刷新本页面重新点击烧录即可。</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Q3: 烧录完成后如何验证？</div>
+      <div class="faq-a">烧录达到 100% 后，芯片会自动软复位，2 秒内屏幕即亮起播放器主控界面。插上 FAT32 格式 TF 卡拷入 MP3 即可开始畅听。</div>
+    </div>
+  </div>
+
+  <footer>
+    <p>开源项目：<a href="https://github.com/Bailan766/ESP32-2432S028R-Plus" target="_blank" rel="noopener">Bailan766 / ESP32-2432S028R-Plus</a> · 硬件平台: CYD Plus</p>
+  </footer>
+
+</div>
+
+<!-- Three.js 3D Circuit & ESP32 Microchip Engine -->
+<script>
+function selectManifest(manifestFile, type) {
+  var installer = document.getElementById('installer');
+  if (installer) {
+    installer.setAttribute('manifest', manifestFile);
+  }
+  document.getElementById('mode-card-full').classList.toggle('active', type === 'full');
+  document.getElementById('mode-card-update').classList.toggle('active', type === 'update');
+}
+
+if (!('serial' in navigator)) {
+  document.getElementById('unsupported-alert').style.display = 'block';
+}
+
+/* ==========================================================
+   Three.js 3D ESP32 Chip & PCB Circuit Visualizer
+   ========================================================== */
+(function initThreeScene() {
+  if (typeof THREE === 'undefined') return;
+
+  var canvas = document.getElementById('bg-canvas');
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x070a14, 0.002);
+
+  var camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1500);
+  camera.position.set(0, 100, 360);
+
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // --- 1. Undulating PCB Circuit Grid ---
+  var gridGeo = new THREE.PlaneGeometry(1200, 1200, 40, 40);
+  gridGeo.rotateX(-Math.PI / 2);
+  var gridMat = new THREE.MeshBasicMaterial({
+    color: 0x00f0ff,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.14
+  });
+  var gridMesh = new THREE.Mesh(gridGeo, gridMat);
+  gridMesh.position.y = -140;
+  scene.add(gridMesh);
+
+  // --- 2. ESP32 3D Holographic Chip Group ---
+  var chipGroup = new THREE.Group();
+
+  // Chip Base Body (Silicon Package)
+  var chipBaseGeo = new THREE.BoxGeometry(90, 8, 90);
+  var chipBaseMat = new THREE.MeshBasicMaterial({
+    color: 0x101726,
+    wireframe: false
+  });
+  var chipBase = new THREE.Mesh(chipBaseGeo, chipBaseMat);
+  chipGroup.add(chipBase);
+
+  // Chip Wireframe Neon Edges
+  var edgesGeo = new THREE.EdgesGeometry(chipBaseGeo);
+  var edgesMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, linewidth: 2 });
+  var chipEdges = new THREE.LineSegments(edgesGeo, edgesMat);
+  chipGroup.add(chipEdges);
+
+  // Metal Shielding Can (ESP-WROOM-32 Can)
+  var canGeo = new THREE.BoxGeometry(65, 5, 65);
+  var canMat = new THREE.MeshBasicMaterial({
+    color: 0x1e293b,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.5
+  });
+  var canMesh = new THREE.Mesh(canGeo, canMat);
+  canMesh.position.y = 6;
+  chipGroup.add(canMesh);
+
+  // Orbiting Golden Signal Ring
+  var ringGeo = new THREE.TorusGeometry(85, 1, 16, 80);
+  var ringMat = new THREE.MeshBasicMaterial({
+    color: 0xffb703,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.4
+  });
+  var signalRing = new THREE.Mesh(ringGeo, ringMat);
+  signalRing.rotation.x = Math.PI / 2;
+  chipGroup.add(signalRing);
+
+  // Floating Status LED (GPIO2 Blinking Blue Indicator)
+  var ledGeo = new THREE.SphereGeometry(3, 16, 16);
+  var ledMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+  var statusLed = new THREE.Mesh(ledGeo, ledMat);
+  statusLed.position.set(30, 8, -30);
+  chipGroup.add(statusLed);
+
+  chipGroup.position.set(0, 30, -60);
+  scene.add(chipGroup);
+
+  // --- 3. Digital Serial Data Particles ---
+  var particleCount = 800;
+  var particleGeo = new THREE.BufferGeometry();
+  var particlePos = new Float32Array(particleCount * 3);
+  var particleColors = new Float32Array(particleCount * 3);
+
+  var colCyan = new THREE.Color(0x00f0ff);
+  var colGreen = new THREE.Color(0x00ff88);
+  var colAmber = new THREE.Color(0xffb703);
+
+  for (var i = 0; i < particleCount; i++) {
+    particlePos[i * 3] = (Math.random() - 0.5) * 1400;
+    particlePos[i * 3 + 1] = (Math.random() - 0.5) * 800;
+    particlePos[i * 3 + 2] = (Math.random() - 0.5) * 1200;
+
+    var r = Math.random();
+    var c = r < 0.6 ? colCyan : (r < 0.85 ? colGreen : colAmber);
+    particleColors[i * 3] = c.r;
+    particleColors[i * 3 + 1] = c.g;
+    particleColors[i * 3 + 2] = c.b;
+  }
+
+  particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+  particleGeo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+
+  var particleMat = new THREE.PointsMaterial({
+    size: 3,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.7,
+    blending: THREE.AdditiveBlending
+  });
+  var particles = new THREE.Points(particleGeo, particleMat);
+  scene.add(particles);
+
+  // Mouse Parallax
+  var mouseX = 0, mouseY = 0;
+  var windowHalfX = window.innerWidth / 2;
+  var windowHalfY = window.innerHeight / 2;
+
+  document.addEventListener('mousemove', function(e) {
+    mouseX = (e.clientX - windowHalfX) * 0.15;
+    mouseY = (e.clientY - windowHalfY) * 0.15;
+  });
+
+  window.addEventListener('resize', function() {
+    windowHalfX = window.innerWidth / 2;
+    windowHalfY = window.innerHeight / 2;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Animation Loop
+  var clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    var t = clock.getElapsedTime();
+
+    // Rotate Chip
+    chipGroup.rotation.y = t * 0.25;
+    chipGroup.rotation.x = Math.sin(t * 0.5) * 0.1 + 0.1;
+
+    // Pulse LED
+    var ledScale = 1 + Math.sin(t * 8) * 0.5;
+    statusLed.scale.set(ledScale, ledScale, ledScale);
+
+    // Rotate Ring
+    signalRing.rotation.z = t * 0.4;
+
+    // Particles Drift
+    particles.rotation.y = t * 0.03;
+
+    // Undulate Grid
+    var count = gridGeo.attributes.position.count;
+    for (var j = 0; j < count; j++) {
+      var x = gridGeo.attributes.position.getX(j);
+      var z = gridGeo.attributes.position.getZ(j);
+      var y = Math.sin(x * 0.02 + t) * 12 + Math.cos(z * 0.02 + t) * 12;
+      gridGeo.attributes.position.setY(j, y);
     }
-  </script>
+    gridGeo.attributes.position.needsUpdate = true;
+
+    // Smooth Camera Follow
+    camera.position.x += (mouseX - camera.position.x) * 0.05;
+    camera.position.y += (-mouseY + 80 - camera.position.y) * 0.05;
+    camera.lookAt(0, 20, 0);
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+})();
+</script>
+
 </body>
 </html>
