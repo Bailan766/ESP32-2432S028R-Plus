@@ -2,12 +2,14 @@
 #include "hardware/amplifier.h"
 #include "hardware/audio.h"
 #include "player/player.h"
+#include "system/net_manager.h"
+#include "system/settings_manager.h"
 #include "config.h"
 #include <BluetoothA2DPSink.h>
-#include <driver/i2s.h>
-#include <driver/dac.h>
+#include <A2DPVolumeControl.h>
 
 static BluetoothA2DPSink* s_a2dpSink = nullptr;
+static A2DPNoVolumeControl s_noVolCtrl;
 static bool s_isActive = false;
 static BTSinkState s_state = BT_STATE_STANDBY;
 
@@ -36,11 +38,11 @@ static void avrc_metadata_cb(uint8_t id, const uint8_t *text) {
 static void connection_state_cb(esp_a2d_connection_state_t state, void * /*obj*/) {
   if (state == ESP_A2D_CONNECTION_STATE_CONNECTED) {
     s_state = BT_STATE_CONNECTED;
-    amp_enable();
   } else if (state == ESP_A2D_CONNECTION_STATE_CONNECTING) {
     s_state = BT_STATE_CONNECTING;
   } else {
     s_state = BT_STATE_STANDBY;
+    amp_disable();
     strcpy(s_title, "等待连接...");
     strcpy(s_artist, "手机蓝牙搜索: Bailan-Speaker");
     s_album[0] = '\0';
@@ -50,20 +52,50 @@ static void connection_state_cb(esp_a2d_connection_state_t state, void * /*obj*/
 static void avrc_playstatus_cb(esp_avrc_playback_stat_t playback) {
   if (playback == ESP_AVRC_PLAYBACK_PLAYING) {
     s_state = BT_STATE_PLAYING;
-    amp_enable();
   } else {
     if (s_state == BT_STATE_PLAYING) {
       s_state = BT_STATE_CONNECTED;
     }
+    amp_disable();
   }
 }
 
-static void on_data_received_cb() {
-  s_lastDataTime = millis();
-  if (s_state != BT_STATE_PLAYING) {
-    s_state = BT_STATE_PLAYING;
+static void bt_sample_rate_cb(uint16_t rate) {
+  audio_stream_set_rate(rate);
+}
+
+static void bt_volume_change_cb(int vol) {
+  if (vol < 0) vol = 0;
+  if (vol > 127) vol = 127;
+  s_volume = (uint8_t)((vol * 100 + 63) / 127);
+}
+
+static void bt_pcm_stream_cb(const uint8_t* data, uint32_t len) {
+  if (!s_isActive || !data || len < 4) return;
+
+  const int16_t* pcm = (const int16_t*)data;
+  const uint32_t sampleCount = len / 2;
+  int32_t peak = 0;
+  for (uint32_t i = 0; i < sampleCount; i++) {
+    int32_t v = pcm[i];
+    if (v < 0) v = -v;
+    if (v > peak) {
+      peak = v;
+      if (peak > 2) break;
+    }
+  }
+
+  if (peak > 2) {
+    s_lastDataTime = millis();
+    if (s_state != BT_STATE_PLAYING) {
+      s_state = BT_STATE_PLAYING;
+    }
     amp_enable();
   }
+
+  uint8_t sysVol = settings_get().volume;
+  uint8_t effectiveVol = (uint8_t)(((uint32_t)s_volume * sysVol) / 100U);
+  audio_stream_write_pcm16_stereo(data, len, effectiveVol);
 }
 
 void bt_sink_init() {
@@ -74,61 +106,52 @@ void bt_sink_init() {
 void bt_sink_start() {
   if (s_isActive) return;
 
-  // 1. 停止本体 MP3 播放，避免与蓝牙 I2S/DAC 资源冲突
+  // 1. 挂起 Wi-Fi 射频释放 2.4GHz 天线，停止本体 MP3 播放，启动硬件定时器 DAC2 流引擎
+  net_suspend_for_bt();
   player_stop();
-  amp_enable();
+  audio_stream_start(44100);
+  amp_disable(); // 待机/配对期间保持功放关闭，杜绝射频耦合嗡嗡底噪
 
   if (!s_a2dpSink) {
     s_a2dpSink = new BluetoothA2DPSink();
   }
 
-  // 2. 配置 I2S DAC 内置模式 (只开启 GPIO26 上的 DAC 通道2，完整保留 GPIO25 给触屏 SPI CLK)
-  i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN),
-    .sample_rate = 44100,
-    .bits_per_sample = (i2s_bits_per_sample_t)16,
-    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-    .communication_format = (i2s_comm_format_t)I2S_COMM_FORMAT_STAND_MSB,
-    .intr_alloc_flags = 0,
-    .dma_buf_count = 8,
-    .dma_buf_len = 64,
-    .use_apll = false,
-    .tx_desc_auto_clear = true
-  };
-  s_a2dpSink->set_i2s_config(i2s_config);
+  // 2. 彻底禁用 ESP32-A2DP 内置 I2S 驱动 (is_i2s=false)，避免占用 GPIO25 触控时钟及 I2S-DAC DMA 嗡嗡声
+  s_a2dpSink->set_stream_reader(bt_pcm_stream_cb, false);
+  s_a2dpSink->set_sample_rate_callback(bt_sample_rate_cb);
+  s_a2dpSink->set_volume_control(&s_noVolCtrl);
+  s_a2dpSink->set_on_volumechange(bt_volume_change_cb);
 
   // 3. 注册 AVRCP 元数据与状态回调
   s_a2dpSink->set_avrc_metadata_callback(avrc_metadata_cb);
   s_a2dpSink->set_on_connection_state_changed(connection_state_cb);
   s_a2dpSink->set_avrc_rn_playstatus_callback(avrc_playstatus_cb);
-  s_a2dpSink->set_on_data_received(on_data_received_cb);
-
-  // 4. 启动蓝牙 A2DP 广播服务
-  s_a2dpSink->start(s_deviceName);
 
   s_isActive = true;
   s_state = BT_STATE_STANDBY;
+  s_lastDataTime = 0;
   strcpy(s_title, "等待手机连接...");
   strcpy(s_artist, "手机蓝牙搜索: Bailan-Speaker");
   s_album[0] = '\0';
+
+  // 4. 启动蓝牙 A2DP 广播服务
+  s_a2dpSink->start(s_deviceName);
 }
 
 void bt_sink_stop() {
   if (!s_isActive) return;
 
+  s_isActive = false;
   if (s_a2dpSink) {
-    s_a2dpSink->end(true); // 释放 I2S 与 Bluedroid 堆内存
+    s_a2dpSink->end(true); // 释放 Bluedroid 堆内存
     delete s_a2dpSink;
     s_a2dpSink = nullptr;
   }
 
+  audio_stream_stop();
   amp_disable();
+  net_resume_after_bt();
 
-  // 恢复 DAC2 中点偏置（避免喇叭待机直流偏置）
-  dac_output_enable(DAC_CHANNEL_2);
-  dacWrite(AUDIO_DAC_PIN, 128);
-
-  s_isActive = false;
   s_state = BT_STATE_STANDBY;
 }
 
@@ -137,9 +160,10 @@ bool bt_sink_is_active() {
 }
 
 BTSinkState bt_sink_get_state() {
-  // 若超过 1.5 秒无数据流入且状态是播放中，切回已连接待机
+  // 若超过 1500ms 无有效音频流且状态是播放中，关闭功放并切回已连接待机（避免弱音/句间间隙误关断咔嗒声）
   if (s_state == BT_STATE_PLAYING && (millis() - s_lastDataTime > 1500)) {
     s_state = BT_STATE_CONNECTED;
+    amp_disable();
   }
   return s_state;
 }

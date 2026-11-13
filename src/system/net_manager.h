@@ -22,3 +22,7 @@ void net_wake_radio(uint32_t keepMs);
 
 // 射频当前是否开启
 bool net_radio_is_on();
+
+// 蓝牙音箱模式专用：挂起/恢复 Wi-Fi 射频（避免 2.4GHz 天线时分复用冲突与电源纹波嗡嗡声）
+void net_suspend_for_bt();
+void net_resume_after_bt();

@@ -313,7 +313,7 @@ class BluetoothA2DPSink : public BluetoothA2DPCommon {
     bool spp_active = false;
     esp_spp_mode_t esp_spp_mode = ESP_SPP_MODE_CB;
     _lock_t s_volume_lock;
-    uint8_t s_volume = 0;
+    uint8_t s_volume = 100; // 默认约 80% 音量 (0..127)，避免手机连接时 AVRCP 初始音量为 0 静音
     bool s_volume_notify;
     int pin_code_int = 0;
     PinCodeRequest pin_code_request = Undefined;

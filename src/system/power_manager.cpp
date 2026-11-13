@@ -5,7 +5,10 @@
 #include "hardware/touch.h"
 #include "hardware/battery.h"
 #include "hardware/amplifier.h"
+#include "hardware/audio.h"
 #include "player/player.h"
+#include "bluetooth/bt_sink.h"
+#include "radio/web_radio.h"
 #include "system/net_manager.h"
 #include "ui/font_cn.h"
 #include "config.h"
@@ -75,6 +78,7 @@ bool power_can_light_sleep() {
 #else
   if (!display_is_sleeping()) return false;                       // 屏幕亮着不睡
   if (player_get_state() == STATE_PLAYING) return false;          // 正在放歌不睡
+  if (bt_sink_is_active() || web_radio_is_playing() || audio_is_playing()) return false; // 蓝牙/电台/音频流不睡
   if (net_radio_is_on()) return false;                            // 射频开着不睡
   return true;
 #endif
@@ -197,7 +201,7 @@ void power_update() {
   batteryGuardUpdate();
 
   // 1. CPU 频率自适应
-  if (player_get_state() == STATE_PLAYING) {
+  if (player_get_state() == STATE_PLAYING || bt_sink_is_active() || web_radio_is_playing() || audio_is_playing()) {
     applyCpuFreq(CPU_PLAYING_MHZ);
   } else if (display_is_sleeping()) {
     applyCpuFreq(CPU_IDLE_MHZ);

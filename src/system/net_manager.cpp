@@ -25,6 +25,7 @@ static Preferences s_prefs;
 
 static bool s_powerSave = true;
 static bool s_radioOn = true;
+static bool s_btSuspended = false;
 static unsigned long s_radioOffAt = 0;   // 到点关闭射频
 static unsigned long s_lastRefresh = 0;  // 上次联网刷新时间
 static uint8_t s_connectRetry = 0;       // 未联网时的射频续期次数
@@ -130,7 +131,26 @@ bool net_radio_is_on() {
   return s_radioOn;
 }
 
+void net_suspend_for_bt() {
+  s_btSuspended = true;
+  if (s_radioOn || WiFi.getMode() != WIFI_OFF) {
+    LOG_SYS("蓝牙音箱模式启动: 挂起并关闭 Wi-Fi 射频，释放 2.4GHz 天线与堆内存");
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    s_radioOn = false;
+    s_wasConnected = false;
+    s_radioOffAt = 0;
+    s_connectRetry = 0;
+  }
+}
+
+void net_resume_after_bt() {
+  s_btSuspended = false;
+  s_lastRefresh = millis();
+}
+
 void net_wake_radio(uint32_t keepMs) {
+  if (s_btSuspended) return;
   if (s_radioOn) {
     s_radioOffAt = millis() + keepMs;
     return;
@@ -253,6 +273,7 @@ static void handleSerialCommands() {
 
 void net_update() {
   handleSerialCommands();
+  if (s_btSuspended) return;
 
   const unsigned long now = millis();
 

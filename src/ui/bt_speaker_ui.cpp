@@ -97,6 +97,7 @@ static void renderDynamicInfo() {
 static void renderSpectrumBars() {
   TFT_eSPI& tft = display_get_tft();
   bool isStreaming = bt_sink_has_audio_stream();
+  uint8_t audioLevel = isStreaming ? audio_stream_get_level() : 0;
 
   const int NUM_BARS = 16;
   const int BAR_W = 12;
@@ -108,18 +109,12 @@ static void renderSpectrumBars() {
   for (int i = 0; i < NUM_BARS; i++) {
     uint8_t targetH = 3;
     if (isStreaming) {
-      // 模拟音乐律动波形
-      int r = rand() % 100;
-      if (i < 4) {
-        // 低频重低音
-        targetH = 10 + (r * (MAX_H - 10)) / 100;
-      } else if (i < 12) {
-        // 中频人声
-        targetH = 8 + (r * (MAX_H - 12)) / 100;
-      } else {
-        // 高频泛音
-        targetH = 5 + (r * (MAX_H - 18)) / 100;
-      }
+      // 结合真实 PCM 包络能量与频段权重生成动态频谱柱
+      int baseH = 4 + (audioLevel * (MAX_H - 6)) / 100;
+      int jitter = (rand() % 41) - 15; // -15% ~ +25% 频段起伏
+      int bandScale = (i < 4) ? 105 : ((i < 12) ? 95 : 80);
+      int hCalc = (baseH * (bandScale + jitter)) / 100;
+      targetH = (uint8_t)constrain(hCalc, 3, MAX_H);
     }
 
     // 平滑滤波
@@ -144,10 +139,8 @@ static void renderSpectrumBars() {
   }
 
   if (bt_sink_get_state() == BT_STATE_PLAYING) {
-    int totalH = 0;
-    for (int i = 0; i < NUM_BARS; i++) totalH += s_barHeights[i];
-    uint8_t energy = constrain(map(totalH, 0, NUM_BARS * 25, 20, 255), 0, 255);
-    rgb_beat_pulse(energy, s_barHeights[2] * 40);
+    uint8_t energy = constrain(map(audioLevel, 0, 100, 20, 255), 0, 255);
+    rgb_beat_pulse(energy, 300 + audioLevel * 12);
   }
 }
 
@@ -169,8 +162,8 @@ void bt_speaker_ui_update() {
 void bt_speaker_ui_handle_touch(int16_t x, int16_t y) {
   // 1. 顶部返回按钮 (x: 0..76, y: 0..32)
   if (x <= 76 && y <= 32) {
-    audio_test_beep(1000, 30);
     bt_speaker_ui_leave();
+    audio_test_beep(1000, 30);
     ui_switch_to(UI_PAGE_HOME);
     return;
   }
