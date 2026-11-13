@@ -5,6 +5,7 @@
 #include <AudioGeneratorMP3.h>
 #include <AudioOutput.h>
 #include <driver/dac.h>
+#include "hal/dac_ll.h"
 #include <math.h>
 #include "player/melody_generator.h"
 #include "songs.h"
@@ -35,14 +36,20 @@ static volatile uint16_t s_rbTail = 0;
 static volatile bool s_timerRunning = false;
 
 // 硬件定时器高频中断服务程序 (驻留 IRAM，直接驱动 DAC2)
+//
+// 注意：这里必须用 hal/dac_ll.h 的 static inline 寄存器写入，不能调
+// driver/dac.h 的 dac_output_voltage()。后者链接在 Flash 上、无 IRAM_ATTR，
+// ISR 执行期间一旦发生 Flash 写（NVS 保存设置、SD 写日志等）会关闭 cache，
+// 取指失败直接 Guru Meditation。dac_ll_update_output_value() 会内联进本函数，
+// 全程只碰寄存器，不依赖任何 Flash 代码。
 void IRAM_ATTR onAudioTimer() {
   if (s_rbHead != s_rbTail) {
     uint8_t sample = s_audioRingBuf[s_rbTail];
     s_rbTail = (s_rbTail + 1) & AUDIO_RING_BUF_MASK;
-    dac_output_voltage(DAC_CHANNEL_2, sample);
+    dac_ll_update_output_value(DAC_CHANNEL_2, sample);
   } else {
     // 缓冲区见底或无数据：维持中点偏置
-    dac_output_voltage(DAC_CHANNEL_2, 128);
+    dac_ll_update_output_value(DAC_CHANNEL_2, 128);
   }
 }
 

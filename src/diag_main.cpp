@@ -1,75 +1,80 @@
 // ==============================================================================
-// 硬件诊断固件 v15 —— 功放使能极性 长时裁决 (每段 10 秒)
+// 功放输入引脚扫描 v11.0 —— 在【已知完好的新扬声器】上重做全脚扫描
 //
-// 背景: 商家演示视频显示不接外置功放即可发声 → 板上应存在功放芯片。
-//       此前 4 秒短段测试用户反馈"分不清"，故本版拉长到 10 秒，仅测两段。
+// 背景：早期曾把 14 个 GPIO 逐个当 1kHz 信号源，结论"全部只有嗡声"，
+//       但那次测试用的是【坏喇叭】，整个结论作废。现在换了新扬声器，
+//       必须重扫，否则永远在错误前提上推理。
 //
-// 编排:
-//   P1  GPIO4 = HIGH + DAC2(GPIO26) 1kHz 方波 10 秒
-//   P2  GPIO4 = LOW  + DAC2(GPIO26) 1kHz 方波 10 秒
-//   每段前有 2 秒静音作为"分界提示"，屏幕大字显示当前状态。
+// 做法：候选脚逐个输出 1kHz 数字方波 2.5 秒，GPIO4 常置 LOW（假定功放使能），
+//       屏幕大字显示当前 GPIO 号。听到哪一段响，报出屏幕上的数字即可。
+//
+// 排除：6~11 (Flash/PSRAM)、1/3 (串口)、34/35/36/39 (输入专用)、
+//       12/13/14/15/2/21 (LCD 已占用，扫了会花屏)、4 (固定作使能)。
 // ==============================================================================
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <driver/dac.h>
 
-static TFT_eSPI tft;
+#define AMP_EN_PIN   4
+#define TFT_BL_PIN   21
 
-static void showPhase(const char* big, const char* sub, uint16_t color) {
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(color, TFT_BLACK);
-  tft.drawString(big, 10, 40, 7);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString(sub, 10, 130, 4);
-}
+static const int kPins[] = { 0, 5, 16, 17, 18, 19, 22, 23, 25, 26, 27, 32, 33 };
+static const int kCount  = sizeof(kPins) / sizeof(kPins[0]);
 
-static void playTone(unsigned long ms) {
-  dac_output_enable(DAC_CHANNEL_2);
-  dacWrite(26, 128);
-  const unsigned long start = millis();
-  while (millis() - start < ms) {
-    dacWrite(26, 240); delayMicroseconds(500);
-    dacWrite(26, 15);  delayMicroseconds(500);
-  }
-  dacWrite(26, 128);
-}
+static TFT_eSPI tft = TFT_eSPI();
 
 void setup() {
   Serial.begin(115200);
-  delay(300);
+  delay(150);
+  Serial.println("\n=======================================================");
+  Serial.println("  AMP INPUT PIN SCANNER v11.0 (fresh speaker)");
+  Serial.println("=======================================================");
+
+  ledcSetup(4, 5000, 8);
+  ledcAttachPin(TFT_BL_PIN, 4);
+  ledcWrite(4, 204);
 
   tft.init();
   tft.setRotation(3);
   tft.invertDisplay(false);
+  tft.fillScreen(TFT_BLACK);
 
-  pinMode(4, OUTPUT);
-  digitalWrite(4, LOW);
-
-  Serial.println("########## v15 功放极性长时裁决 (每段 10 秒) ##########");
-  showPhase("READY", "10s each", TFT_DARKGREY);
-  delay(2000);
+  pinMode(AMP_EN_PIN, OUTPUT);
+  digitalWrite(AMP_EN_PIN, LOW);          // 假定低电平开启功放，全程保持
+  dac_output_disable(DAC_CHANNEL_2);      // 释放 GPIO26 供数字输出
 }
 
 void loop() {
-  // ---- P1: 使能脚 HIGH ----
-  digitalWrite(4, LOW);
-  showPhase("SILENT", "2s break", TFT_DARKGREY);
-  delay(2000);
+  for (int i = 0; i < kCount; i++) {
+    int pin = kPins[i];
+    char tag[24];
+    snprintf(tag, sizeof(tag), "GPIO %d", pin);
 
-  digitalWrite(4, HIGH);
-  showPhase("EN = HIGH", "1kHz 10s", TFT_GREEN);
-  Serial.println("[P1] GPIO4=HIGH + DAC 1kHz 10s");
-  playTone(10000);
+    tft.fillScreen(TFT_BLACK);
+    tft.fillRect(0, 0, 320, 40, TFT_NAVY);
+    tft.setTextColor(TFT_WHITE, TFT_NAVY);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString("PIN SCANNER  /  listen 1kHz", 160, 20, 2);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.drawString(tag, 160, 105, 6);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    snprintf(tag, sizeof(tag), "%d / %d", i + 1, kCount);
+    tft.drawString(tag, 160, 170, 2);
 
-  // ---- P2: 使能脚 LOW ----
-  digitalWrite(4, LOW);
-  showPhase("SILENT", "2s break", TFT_DARKGREY);
-  delay(2000);
+    Serial.printf(">>> scanning GPIO %d (%d/%d)\n", pin, i + 1, kCount);
 
-  showPhase("EN = LOW", "1kHz 10s", TFT_ORANGE);
-  Serial.println("[P2] GPIO4=LOW + DAC 1kHz 10s");
-  playTone(10000);
+    pinMode(pin, OUTPUT);
+    unsigned long end = millis() + 2500;
+    while (millis() < end) {
+      digitalWrite(pin, HIGH);
+      delayMicroseconds(500);
+      digitalWrite(pin, LOW);
+      delayMicroseconds(500);
+    }
+    digitalWrite(pin, LOW);
+    pinMode(pin, INPUT);                 // 扫完释放，避免与其他脚打架
 
-  showPhase("SILENT", "3s break", TFT_DARKGREY);
-  delay(3000);
+    tft.fillScreen(TFT_BLACK);
+    delay(400);                          // 段间静音，方便分辨
+  }
 }
