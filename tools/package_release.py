@@ -1,11 +1,24 @@
 import os
+import re
 import sys
 import zipfile
 
+
+def get_project_version(default='v1.2.4'):
+    config_path = os.path.join('include', 'config.h')
+    if not os.path.exists(config_path):
+        return default
+    with open(config_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    m = re.search(r'#define\s+PROJECT_VERSION\s+"([^"]+)"', content)
+    return m.group(1) if m else default
+
+
 def package():
+    version = get_project_version()
     dist_dir = 'dist'
     os.makedirs(dist_dir, exist_ok=True)
-    zip_path = os.path.join(dist_dir, 'Bailan_MP3_v1.1.4_WebFlasher.zip')
+    zip_path = os.path.join(dist_dir, f'Bailan_MP3_{version}_WebFlasher.zip')
     if os.path.exists(zip_path):
         os.remove(zip_path)
 

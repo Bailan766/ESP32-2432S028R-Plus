@@ -23,6 +23,12 @@
   - 严格锁定 i2s_set_dac_mode(I2S_DAC_CHANNEL_LEFT_EN)，仅启用 DAC2 (GPIO 26)，彻底释放 GPIO 25 (TOUCH_SCK) 专供 XPT2046 触控屏高频软件 SPI，播放与触控完全并行互不干扰；
   - 待机与播放启停实施抗爆音中点偏置（128/1.65V）时序管理，消除 8002 功放启闭瞬间的 POP 爆音。
 
+- **蓝牙音箱模式音频链路深度重构 (`2026-11-13` 补丁)**：
+  - **修复蓝牙音箱仅嗡嗡声与低音质**：修正 `ESP32-A2DP` 默认音量归零、蓝牙模式下暂停 Wi-Fi (`net_suspend_for_bt`) 消除 2.4GHz 射频互扰、锁定 240MHz 主频并阻止轻睡眠；
+  - **独立 GPIO26 `I2S0-DMA + Sigma-Delta` 推流引擎**：蓝牙 A2DP 采用 `I2S_NUM_0` + `I2S_DAC_CHANNEL_LEFT_EN` 仅驱动 `DAC_CHANNEL_2` (GPIO 26)，严禁 `i2s_set_pin(NULL)` 触碰 `TOUCH_SCK_PIN` (GPIO 25)，完整保障触控屏 SPI 时钟隔离；
+  - **音质增强 DSP 管线**：加入 2x 线性插值过采样（88.2kHz / 96kHz）、一阶高通去直流、软限幅（±26000 起步 + 0.85x 余量）及一阶误差反馈 Sigma-Delta 噪声整形，并优化静音门限 (`peak > 2`) 与功放防误关断超时 (`1500ms`)。
+  - **本地 MP3 / 旋律硬件定时器隔离**：保留 `Hardware Timer 0` + IRAM `dac_ll_update_output_value` 直驱方案供本地播放使用，并修复见底重复预缓冲导致的偶发卡顿。
+
 ---
 
 ## [v1.1.4] - 2026-11-01 (Light Sleep硬件级浅休眠与低电量保护重构)

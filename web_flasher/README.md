@@ -21,5 +21,5 @@
 
 ## 📦 固件说明
 
-- **`firmware_full.bin` (0x0)**: 全量固件镜像（内含 Bootloader + Partitions 分区表 + BootApp0 + v1.1.4 应用程序）。适合全新刷机或疑难故障急救。
+- **`firmware_full.bin` (0x0)**: 全量固件镜像（内含 Bootloader + Partitions 分区表 + BootApp0 + v1.2.4 应用程序）。适合全新刷机或疑难故障急救。
 - **`firmware.bin` (0x10000)**: 应用程序增量固件。仅更新系统程序，自动保留机器原有的 Wi-Fi 配置与触控校准参数。
