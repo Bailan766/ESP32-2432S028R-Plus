@@ -9,6 +9,17 @@ void audio_init();
 void audio_set_volume(uint8_t volume_percent);
 uint8_t audio_get_volume();
 
+// 轻量级自适应音效模式 (所有播放源共享)
+enum AudioEQMode : uint8_t {
+  AUDIO_EQ_FLAT = 0,        // 原声平衡
+  AUDIO_EQ_WARM_BASS = 1,   // 温暖低音 (补偿小喇叭低频)
+  AUDIO_EQ_CLEAR_VOCAL = 2  // 清晰人声 (听书/电台人声增强)
+};
+void audio_set_eq(AudioEQMode mode);
+AudioEQMode audio_get_eq();
+AudioEQMode audio_cycle_eq();
+const char* audio_get_eq_name(AudioEQMode mode);
+
 // 音频播放核心接口
 bool audio_play_mp3(const char* filepath);
 bool audio_play_demo(int songIndex);

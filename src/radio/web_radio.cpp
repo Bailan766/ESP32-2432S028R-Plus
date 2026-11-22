@@ -1,11 +1,13 @@
 #include "web_radio.h"
 #include <WiFi.h>
+#include <SD.h>
 #include <AudioFileSourceHTTPStream.h>
 #include <AudioFileSourceBuffer.h>
 #include <AudioGeneratorMP3.h>
 #include "hardware/audio.h"
 #include "hardware/amplifier.h"
 #include "hardware/rgb.h"
+#include "storage/sdcard.h"
 #include "system/net_manager.h"
 #include "config.h"
 
@@ -18,6 +20,59 @@ static const RadioStation STATIONS[] = {
 };
 
 static const int NUM_STATIONS = sizeof(STATIONS) / sizeof(STATIONS[0]);
+static const int MAX_CUSTOM_STATIONS = 16;
+static RadioStation s_customStations[MAX_CUSTOM_STATIONS];
+static char s_customNames[MAX_CUSTOM_STATIONS][32];
+static char s_customGenres[MAX_CUSTOM_STATIONS][24];
+static char s_customUrls[MAX_CUSTOM_STATIONS][96];
+static int s_customCount = 0;
+
+static void loadCustomStationsFromSD() {
+  s_customCount = 0;
+  if (!sdcard_is_available() || !SD.exists("/radio.txt")) return;
+
+  File f = SD.open("/radio.txt", FILE_READ);
+  if (!f) return;
+
+  while (f.available() && s_customCount < MAX_CUSTOM_STATIONS) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0 || line.startsWith("#")) continue;
+
+    int p1 = line.indexOf('|');
+    if (p1 <= 0) continue;
+    int p2 = line.indexOf('|', p1 + 1);
+
+    String name = line.substring(0, p1);
+    String genre = (p2 > p1) ? line.substring(p1 + 1, p2) : "自定义电台";
+    String url = (p2 > p1) ? line.substring(p2 + 1) : line.substring(p1 + 1);
+    name.trim();
+    genre.trim();
+    url.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) continue;
+
+    int i = s_customCount;
+    snprintf(s_customNames[i], sizeof(s_customNames[i]), "%s", name.c_str());
+    snprintf(s_customGenres[i], sizeof(s_customGenres[i]), "%s", genre.c_str());
+    snprintf(s_customUrls[i], sizeof(s_customUrls[i]), "%s", url.c_str());
+    s_customStations[i] = { s_customNames[i], s_customGenres[i], s_customUrls[i] };
+    s_customCount++;
+  }
+  f.close();
+  if (s_customCount > 0) {
+    LOG_AUDIO("网络电台: 已从 /radio.txt 加载 %d 个自定义电台", s_customCount);
+  }
+}
+
+static int activeStationCount() {
+  return (s_customCount > 0) ? s_customCount : NUM_STATIONS;
+}
+
+static const RadioStation* activeStationAt(int idx) {
+  int total = activeStationCount();
+  int safeIdx = ((idx % total) + total) % total;
+  return (s_customCount > 0) ? &s_customStations[safeIdx] : &STATIONS[safeIdx];
+}
 static int s_curStation = 0;
 static bool s_isPlaying = false;
 static char s_statusText[48] = "已停止";
@@ -53,8 +108,9 @@ static bool startStream(int idx) {
     return false;
   }
 
-  s_curStation = (idx + NUM_STATIONS) % NUM_STATIONS;
-  const RadioStation& st = STATIONS[s_curStation];
+  int total = activeStationCount();
+  s_curStation = ((idx % total) + total) % total;
+  const RadioStation& st = *activeStationAt(s_curStation);
   snprintf(s_statusText, sizeof(s_statusText), "正在连接电台...");
   LOG_AUDIO("网络电台: 正在连接 %s (%s)", st.name, st.url);
 
@@ -91,6 +147,7 @@ void web_radio_init() {
 void web_radio_start() {
   net_wake_radio(0xFFFFFFFF); // 开启常开 Wi-Fi
   audio_stop();              // 停止本地 MP3 播放
+  loadCustomStationsFromSD();
   startStream(s_curStation);
 }
 
@@ -110,10 +167,12 @@ void web_radio_loop() {
         snprintf(s_statusText, sizeof(s_statusText), "电台流断开");
         s_isPlaying = false;
       } else {
-        // 随音乐节拍呼吸灯律动
+        // 随真实 PCM 音频能量呼吸灯律动
         if (millis() - s_lastRgbBeat >= 70) {
           s_lastRgbBeat = millis();
-          rgb_beat_pulse(random(100, 240), random(120, 1500));
+          uint8_t lvl = audio_stream_get_level();
+          uint8_t energy = constrain(map(lvl, 0, 100, 30, 255), 30, 255);
+          rgb_beat_pulse(energy, 300 + lvl * 12);
         }
       }
     }
@@ -141,15 +200,16 @@ void web_radio_prev() {
 }
 
 const RadioStation* web_radio_get_current_station() {
-  return &STATIONS[s_curStation];
+  return activeStationAt(s_curStation);
 }
 
 int web_radio_get_station_index() {
-  return s_curStation;
+  int total = activeStationCount();
+  return (s_curStation >= 0 && s_curStation < total) ? s_curStation : 0;
 }
 
 int web_radio_get_total_stations() {
-  return NUM_STATIONS;
+  return activeStationCount();
 }
 
 const char* web_radio_get_status_text() {

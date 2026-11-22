@@ -16,10 +16,12 @@ static char s_lastStatusStr[48] = {0};
 static void renderWaveBars() {
   TFT_eSPI& tft = display_get_tft();
   bool playing = web_radio_is_playing();
+  uint8_t lvl = playing ? audio_stream_get_level() : 0;
   int waveX = 180, waveY = 152;
   tft.fillRect(waveX, waveY - 22, 48, 24, COLOR_PANEL_BG);
   for (int i = 0; i < 6; i++) {
-    int h = playing ? (4 + abs((int)(sin((s_wavePhase + i * 40) * 0.08f) * 16.0f))) : 3;
+    int mod = (abs((int)(sin((s_wavePhase + i * 45) * 0.09f) * 6.0f)));
+    int h = playing ? constrain(3 + (lvl * 15) / 100 + mod, 3, 22) : 3;
     tft.fillRect(waveX + i * 8, waveY - h, 5, h, playing ? COLOR_ACCENT_GREEN : 0x2965);
   }
 }
@@ -76,7 +78,7 @@ static void renderDynamicInfo() {
   tft.drawFastVLine(pointerX - 1, 35, 18, TFT_RED);
 
   char dialBuf[32];
-  snprintf(dialBuf, sizeof(dialBuf), "FM %d/5", idx + 1);
+  snprintf(dialBuf, sizeof(dialBuf), "FM %d/%d", idx + 1, total);
   font_draw_string(24, 50, dialBuf, COLOR_ACCENT_CYAN, 0x10A2, 1);
 
   // 清除电台信息区 (x: 24, y: 78, w: 270, h: 84)

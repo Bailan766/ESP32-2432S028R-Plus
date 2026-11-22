@@ -17,93 +17,79 @@ static uint16_t s_lastElapsed = 0;
 
 static void renderHeroPlayerCard() {
   TFT_eSPI& tft = display_get_tft();
-  int16_t x = 10, y = 34, w = 300, h = 56;
+  int16_t x = 10, y = 33, w = 300, h = 58;
 
   PlayerState st = player_get_state();
   const TrackInfo* curTrack = player_get_current_track();
   bool playing = (st == STATE_PLAYING);
   bool paused = (st == STATE_PAUSED);
 
-  // 1. 卡片哑光底座与微弱分割轮廓
-  tft.fillRoundRect(x, y, w, h, 6, UI_COL_SURFACE);
-  tft.drawRoundRect(x, y, w, h, 6, playing ? UI_COL_BORDER_LIGHT : UI_COL_BORDER_SUBTLE);
+  // 1. M3 柔和粉红 -> 玫瑰色渐变主卡片 (大圆角 14px，无生硬边框)
+  ui_theme_draw_gradient_card(x, y, w, h, 14, M3_HERO_START, M3_HERO_END);
 
-  // 2. 左侧主状态垂直指示条 (3px)
-  uint16_t accentCol = playing ? UI_COL_AMBER : (paused ? UI_COL_CYAN : UI_COL_BORDER_LIGHT);
-  tft.fillRect(x + 2, y + 8, 3, h - 16, accentCol);
-
-  // 3. 动态状态图标
-  int iconX = x + 12, iconY = y + 14;
+  // 2. 左侧高对比度深酒红状态圆盘
+  int cx = x + 22, cy = y + 26;
+  tft.fillCircle(cx, cy, 13, M3_ON_PRIMARY);
   if (playing) {
-    tft.fillRoundRect(iconX, iconY, 20, 20, 4, UI_COL_AMBER_DIM);
-    tft.drawRoundRect(iconX, iconY, 20, 20, 4, UI_COL_AMBER);
-    tft.fillTriangle(iconX + 7, iconY + 5, iconX + 7, iconY + 15, iconX + 15, iconY + 10, UI_COL_AMBER);
-  } else if (paused) {
-    tft.fillRoundRect(iconX, iconY, 20, 20, 4, UI_COL_SURFACE_HIGH);
-    tft.drawRoundRect(iconX, iconY, 20, 20, 4, UI_COL_CYAN);
-    tft.fillRect(iconX + 6, iconY + 5, 3, 10, UI_COL_CYAN);
-    tft.fillRect(iconX + 11, iconY + 5, 3, 10, UI_COL_CYAN);
+    tft.fillRect(cx - 4, cy - 5, 3, 10, M3_HERO_START);
+    tft.fillRect(cx + 1, cy - 5, 3, 10, M3_HERO_START);
   } else {
-    tft.fillRoundRect(iconX, iconY, 20, 20, 4, UI_COL_SURFACE_HIGH);
-    tft.drawRoundRect(iconX, iconY, 20, 20, 4, UI_COL_BORDER_LIGHT);
-    tft.fillRect(iconX + 6, iconY + 6, 8, 8, UI_COL_TEXT_MUTED);
+    tft.fillTriangle(cx - 3, cy - 5, cx - 3, cy + 5, cx + 5, cy, M3_HERO_START);
   }
 
-  // 4. 曲目名称与艺术家/规格 (x: 40 ~ 216, 宽 176)
+  // 3. 高对比度深色粗体主标题 + 常规副标题 (透明背景叠加于渐变上)
   char titleBuf[32];
   if (curTrack && strlen(curTrack->title) > 0) {
     snprintf(titleBuf, sizeof(titleBuf), "%s", curTrack->title);
   } else {
-    snprintf(titleBuf, sizeof(titleBuf), "%s", "未选择曲目");
+    snprintf(titleBuf, sizeof(titleBuf), "%s", "点击立即播放");
   }
-
-  // 清除文字背景区域防重叠
-  tft.fillRect(x + 38, y + 8, 168, 36, UI_COL_SURFACE);
-  font_draw_string_clipped(x + 38, y + 8, 168, titleBuf, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+  font_draw_string_bold(x + 42, y + 8, 166, titleBuf, M3_ON_PRIMARY, M3_ON_PRIMARY, 1);
 
   char subBuf[48];
   if (curTrack && strlen(curTrack->artist) > 0) {
-    snprintf(subBuf, sizeof(subBuf), "%s · DAC2", curTrack->artist);
+    snprintf(subBuf, sizeof(subBuf), "%s · %s", curTrack->artist, audio_get_eq_name(audio_get_eq()));
   } else {
-    snprintf(subBuf, sizeof(subBuf), "点击进入完整播放器");
+    snprintf(subBuf, sizeof(subBuf), "Hi-Fi I2S-DAC · %s", audio_get_eq_name(audio_get_eq()));
   }
-  font_draw_string_clipped(x + 38, y + 28, 168, subBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(x + 42, y + 28, 166, subBuf, M3_PRIMARY_CONTAINER, M3_PRIMARY_CONTAINER, 1);
 
-  // 5. 右侧状态指示药丸胶囊 (x: 216, y: 44, w: 86, h: 26)
-  int pillX = x + w - 88, pillY = y + 14, pillW = 80, pillH = 26;
+  // 4. 右侧 M3 胶囊状态徽章
+  int pillX = x + w - 82, pillY = y + 14, pillW = 72, pillH = 24;
   if (playing) {
-    ui_theme_draw_pill_btn(pillX, pillY, pillW, pillH, "正在播放", UI_COL_AMBER, UI_COL_AMBER_DIM, UI_COL_AMBER);
+    ui_theme_draw_badge(pillX, pillY, pillW, pillH, "播放中", M3_HERO_START, M3_ON_PRIMARY);
   } else if (paused) {
-    ui_theme_draw_pill_btn(pillX, pillY, pillW, pillH, "播放暂停", UI_COL_CYAN, UI_COL_SURFACE_HIGH, UI_COL_CYAN);
+    ui_theme_draw_badge(pillX, pillY, pillW, pillH, "已暂停", M3_HERO_START, M3_PRIMARY_CONTAINER);
   } else {
-    ui_theme_draw_pill_btn(pillX, pillY, pillW, pillH, "待机就绪", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+    ui_theme_draw_badge(pillX, pillY, pillW, pillH, "默认", M3_HERO_START, M3_PRIMARY_CONTAINER);
   }
 
-  // 6. 底沿微刻度时间轴进度条 (y: y + h - 3, h = 2)
+  // 5. 底沿 M3 圆角进度条
   uint16_t elapsed = player_get_elapsed_seconds();
   uint16_t total = player_get_total_seconds();
   if (total == 0) total = 180;
-  int progW = (int)((long)elapsed * (w - 8) / total);
-  progW = constrain(progW, 0, w - 8);
+  int trackW = w - 28;
+  int progW = constrain((int)((long)elapsed * trackW / total), 0, trackW);
 
-  tft.fillRect(x + 4, y + h - 3, w - 8, 2, UI_COL_BORDER_SUBTLE);
-  if (progW > 0 && playing) {
-    tft.fillRect(x + 4, y + h - 3, progW, 2, UI_COL_AMBER);
+  tft.fillRoundRect(x + 14, y + h - 7, trackW, 3, 1, M3_PRIMARY_CONTAINER);
+  if (progW > 2 && (playing || paused)) {
+    tft.fillRoundRect(x + 14, y + h - 7, progW, 3, 1, M3_ON_PRIMARY);
   }
 }
 
 static void renderGridCard(int16_t x, int16_t y, int16_t w, int16_t h,
-                           const char* title, const char* sub, uint16_t dotCol) {
-  TFT_eSPI& tft = display_get_tft();
-  tft.fillRoundRect(x, y, w, h, 6, UI_COL_SURFACE);
-  tft.drawRoundRect(x, y, w, h, 6, UI_COL_BORDER_SUBTLE);
+                           const char* title, const char* sub,
+                           uint16_t iconBg, uint16_t iconFg,
+                           M3IconType icon, bool scalloped) {
+  // M3 暖梅灰容器层级，大圆角 12px，无生硬边框
+  ui_theme_draw_panel(x, y, w, h, 12, UI_COL_SURFACE, UI_COL_SURFACE);
 
-  // 左侧微圆点指示器
-  tft.fillCircle(x + 12, y + 14, 3, dotCol);
+  // 左侧 M3 有机/圆角柔和色块图标底衬
+  ui_theme_draw_icon_badge(x + 21, y + h / 2, 26, iconBg, iconFg, icon, scalloped);
 
-  // 标题与副标题
-  font_draw_string_clipped(x + 22, y + 5, w - 26, title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
-  font_draw_string_clipped(x + 22, y + 24, w - 26, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  // 右侧双层排版: 粗体主标题 + 常规暖灰副标题
+  font_draw_string_bold(x + 40, y + 5, w - 44, title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(x + 40, y + 24, w - 44, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 }
 
 void home_enter() {
@@ -112,46 +98,43 @@ void home_enter() {
 
   ui_draw_header("摆烂播放器", false);
 
-  // 1. 上位 Hero 播放控制主舱 (x: 10, y: 34, w: 300, h: 56)
+  // 1. 上位 M3 粉玫瑰渐变主卡片 (x: 10, y: 33, w: 300, h: 58)
   renderHeroPlayerCard();
   s_lastPlayerState = player_get_state();
   s_lastTrack = player_get_current_track();
   s_lastElapsed = player_get_elapsed_seconds();
 
-  // 2. 中位 2x2 极简功能舱 (y: 96 ~ 188)
-  // Row 0, Col 0: 曲库音乐 (x: 10, y: 96, w: 146, h: 44)
+  // 2. 中位 2x2 M3 暖灰容器功能块 (y: 96 ~ 190, 圆角 12px)
   char musicSub[32];
-  snprintf(musicSub, sizeof(musicSub), "本地曲目 (%d首)", db_get_track_count());
-  renderGridCard(10, 96, 146, 44, "曲库音乐", musicSub, UI_COL_AMBER);
+  snprintf(musicSub, sizeof(musicSub), "本地·%d首", db_get_track_count());
+  renderGridCard(10, 96, 146, 44, "曲库音乐", musicSub, M3_PRIMARY_CONTAINER, M3_PRIMARY, M3_ICON_NOTE, true);
 
-  // Row 0, Col 1: 文墨书架 (x: 164, y: 96, w: 146, h: 44)
   char novelSub[32];
-  snprintf(novelSub, sizeof(novelSub), "TXT小说 (%d本)", novel_get_count());
-  renderGridCard(164, 96, 146, 44, "文墨书架", novelSub, UI_COL_CYAN);
+  snprintf(novelSub, sizeof(novelSub), "TXT·%d本", novel_get_count());
+  renderGridCard(164, 96, 146, 44, "文墨书架", novelSub, M3_TERTIARY_CONTAINER, M3_TERTIARY, M3_ICON_BOOK, false);
 
-  // Row 1, Col 0: 极客大厅 (x: 10, y: 146, w: 146, h: 44)
-  renderGridCard(10, 146, 146, 44, "极客大厅", "电台·传书·摸鱼", UI_COL_GREEN);
+  renderGridCard(10, 145, 146, 44, "极客大厅", "电台·传书·玩物", M3_SECONDARY_CONTAINER, M3_PRIMARY, M3_ICON_RADIO, false);
+  renderGridCard(164, 145, 146, 44, "系统控制", "音效·电量·设置", UI_COL_SURFACE_PRESS, UI_COL_TEXT_PRIMARY, M3_ICON_SLIDERS, true);
 
-  // Row 1, Col 1: 系统控制 (x: 164, y: 146, w: 146, h: 44)
-  renderGridCard(164, 146, 146, 44, "系统控制", "耗电·硬件·设置", UI_COL_TEXT_MUTED);
+  // 3. 下位 M3 悬浮胶囊底栏 (x: 10, y: 195, w: 300, h: 38, 全半圆胶囊 r=19)
+  tft.fillRoundRect(10, 195, 300, 38, 19, UI_COL_SURFACE_HIGH);
 
-  // 3. 下位极客底座栏 (y: 196 ~ 234, h = 38, 3 个微胶囊按钮)
-  // Left: TF 卡状态 (x: 10, w: 96)
+  // Left Tab: TF 卡状态
   if (sdcard_is_available()) {
-    char tfBuf[32];
+    char tfBuf[24];
     uint32_t mb = sdcard_get_size_mb();
-    if (mb >= 1024) snprintf(tfBuf, sizeof(tfBuf), "TF:%uG就绪", (unsigned)(mb / 1024));
-    else snprintf(tfBuf, sizeof(tfBuf), "TF:%uM就绪", (unsigned)mb);
-    ui_theme_draw_pill_btn(10, 196, 96, 36, tfBuf, UI_COL_GREEN, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
+    if (mb >= 1024) snprintf(tfBuf, sizeof(tfBuf), "TF:%uG", (unsigned)(mb / 1024));
+    else snprintf(tfBuf, sizeof(tfBuf), "TF:%uM", (unsigned)mb);
+    ui_theme_draw_badge(15, 200, 88, 28, tfBuf, M3_SAGE, M3_SAGE_CONTAINER);
   } else {
-    ui_theme_draw_pill_btn(10, 196, 96, 36, "TF:点击挂载", UI_COL_AMBER, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
+    ui_theme_draw_badge(15, 200, 88, 28, "挂载TF", M3_TERTIARY, UI_COL_SURFACE_PRESS);
   }
 
-  // Center: 蓝牙音箱快捷 (x: 112, w: 96)
-  ui_theme_draw_pill_btn(112, 196, 96, 36, "蓝牙音箱", UI_COL_CYAN, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
+  // Center Active Tab: 蓝牙音箱 (M3 暖粉/深酒红选中胶囊)
+  ui_theme_draw_badge(110, 200, 100, 28, "蓝牙音箱", M3_PRIMARY, M3_PRIMARY_CONTAINER);
 
-  // Right: 桌面时钟快捷 (x: 214, w: 96)
-  ui_theme_draw_pill_btn(214, 196, 96, 36, "桌面时钟", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
+  // Right Tab: 桌面时钟
+  ui_theme_draw_badge(217, 200, 88, 28, "桌面时钟", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_PRESS);
 }
 
 void home_update() {

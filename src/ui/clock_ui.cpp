@@ -1,11 +1,16 @@
 #include "clock_ui.h"
 #include "ui.h"
+#include "ui_theme.h"
 #include "hardware/display.h"
 #include "hardware/battery.h"
 #include "hardware/audio.h"
 #include "font_cn.h"
 #include "system/net_manager.h"
 #include "system/weather.h"
+#include "system/settings_manager.h"
+#include "system/power_manager.h"
+#include "player/player.h"
+#include "radio/web_radio.h"
 #include "config.h"
 #include <time.h>
 #include <WiFi.h>
@@ -14,6 +19,7 @@ static unsigned long s_lastClockSec = 0;
 static int s_lastMin = -1;
 static int s_lastSec = -1;
 static bool s_isFlipMode = true; // 默认采用复古拟物翻页时钟模式
+static bool s_nightDim = false;  // 桌面夜光低亮模式 (15% 亮度护眼)
 
 static const char* getWeekDayName(int wday) {
   switch (wday) {
@@ -28,55 +34,49 @@ static const char* getWeekDayName(int wday) {
   }
 }
 
-// 绘制单张复古拟物翻页卡片 (Split-Flap Plate)
+// 绘制单张 M3 拟物翻页大卡片 (Split-Flap Plate)
 static void drawFlipCard(int16_t x, int16_t y, int16_t w, int16_t h, const char* str) {
   TFT_eSPI& tft = display_get_tft();
   int midY = y + h / 2;
 
-  // 上半卡片 (稍亮微渐变黑灰)
-  tft.fillRoundRect(x, y, w, h / 2 + 1, 6, 0x2124);
-  // 下半卡片 (稍暗带阴影黑灰)
-  tft.fillRoundRect(x, midY, w, h / 2 + 1, 6, 0x10A2);
-  // 卡片立体外边框
-  tft.drawRoundRect(x, y, w, h, 6, 0x4228);
+  // 上半卡片 (M3 SurfaceContainerHigh) + 下半卡片 (M3 SurfaceContainer), 大圆角 14px 无细边框
+  tft.fillRoundRect(x, y, w, h / 2 + 1, 14, UI_COL_SURFACE_HIGH);
+  tft.fillRoundRect(x, midY, w, h / 2 + 1, 14, UI_COL_SURFACE);
 
   // 绘制大号数字文本 (Font 7 为 48px 大数码字体)
   tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(0xFFDE); // 复古象牙白
+  tft.setTextColor(M3_HERO_START); // 柔和玫瑰象牙粉数字
   tft.setTextFont(7);
   tft.drawString(str, x + w / 2, midY + 1);
   tft.setTextFont(1);
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(1);
 
-  // 机械横切缝与固定转轴槽 (Split Seam)
-  tft.drawFastHLine(x + 2, midY - 1, w - 4, 0x0000);
-  tft.drawFastHLine(x + 2, midY,     w - 4, 0x0000);
-  tft.drawFastHLine(x + 3, midY + 1, w - 6, 0x2965); // 缝隙微光下边缘
-
-  // 左右两侧金属转轴扣 (Hinge Pins)
-  tft.fillRect(x, midY - 3, 3, 6, 0xC618);
-  tft.fillRect(x + w - 3, midY - 3, 3, 6, 0xC618);
+  // 机械横切缝与金属转轴槽
+  tft.drawFastHLine(x + 4, midY - 1, w - 8, UI_COL_BG);
+  tft.drawFastHLine(x + 4, midY,     w - 8, UI_COL_BG);
+  tft.fillRoundRect(x, midY - 3, 4, 6, 2, M3_PRIMARY_CONTAINER);
+  tft.fillRoundRect(x + w - 4, midY - 3, 4, 6, 2, M3_PRIMARY_CONTAINER);
 }
 
-// 渲染复古机械翻页时钟界面
+// 渲染 M3 复古机械翻页时钟界面
 static void renderFlipClock(const struct tm& timeinfo) {
   TFT_eSPI& tft = display_get_tft();
-  tft.fillScreen(0x0841); // 经典深灰底色
+  tft.fillScreen(UI_COL_BG);
 
   // 1. 顶部小状态栏
   char ipBuf[32];
   if (WiFi.status() == WL_CONNECTED) {
-    snprintf(ipBuf, sizeof(ipBuf), "NTP已校准 | %s", WiFi.SSID().c_str());
-    font_draw_string_clipped(14, 6, 198, ipBuf, COLOR_ACCENT_GREEN, 0x0841, 1);
+    snprintf(ipBuf, sizeof(ipBuf), "NTP已校准 · %s", WiFi.SSID().c_str());
+    font_draw_string_clipped(14, 6, 198, ipBuf, M3_SAGE, UI_COL_BG, 1);
   } else {
-    font_draw_string(14, 6, "离线时钟 (点下方配网)", COLOR_TEXT_MUTED, 0x0841, 1);
+    font_draw_string(14, 6, "离线时钟 (点击此处配网)", UI_COL_TEXT_MUTED, UI_COL_BG, 1);
   }
 
   // 右侧电量显示
   char bBuf[24];
   snprintf(bBuf, sizeof(bBuf), "%d%% %.2fV", battery_get_percent(), battery_get_voltage());
-  font_draw_string(216, 6, bBuf, COLOR_ACCENT_CYAN, 0x0841, 1);
+  font_draw_string(216, 6, bBuf, M3_PRIMARY, UI_COL_BG, 1);
 
   // 2. 机械翻页双大卡片 (小时 + 分钟)
   char hourStr[4], minStr[4];
@@ -87,54 +87,64 @@ static void renderFlipClock(const struct tm& timeinfo) {
   drawFlipCard(18, cardY, cardW, cardH, hourStr);
   drawFlipCard(176, cardY, cardW, cardH, minStr);
 
-  // 中间拟物双点闪烁冒号
+  // 中间闪烁冒号
   bool secEven = (timeinfo.tm_sec % 2 == 0);
-  uint16_t colonCol = secEven ? COLOR_ACCENT_CYAN : 0x2124;
+  uint16_t colonCol = secEven ? M3_PRIMARY : UI_COL_SURFACE;
   tft.fillCircle(160, cardY + 36, 4, colonCol);
   tft.fillCircle(160, cardY + 72, 4, colonCol);
 
-  // 3. 秒数动感刻度进度线 (y: 144)
+  // 3. 秒数 M3 动感刻度进度条 (y: 142)
   int secW = map(timeinfo.tm_sec, 0, 59, 0, 284);
-  tft.fillRoundRect(18, 142, 284, 5, 2, 0x10A2);
+  tft.fillRoundRect(18, 142, 284, 5, 2, UI_COL_SURFACE);
   if (secW > 0) {
-    tft.fillRoundRect(18, 142, secW, 5, 2, COLOR_ACCENT_CYAN);
+    tft.fillRoundRect(18, 142, secW, 5, 2, M3_PRIMARY);
   }
 
-  // 4. 底部桌面信息卡片 (y: 154, w: 288, h: 42)
-  tft.fillRoundRect(16, 153, 288, 42, 6, COLOR_PANEL_BG);
-  tft.drawRoundRect(16, 153, 288, 42, 6, COLOR_PANEL_BORDER);
+  // 4. 底部 M3 大圆角桌面信息卡片 (y: 153, w: 288, h: 42, r: 12)
+  ui_theme_draw_panel(16, 153, 288, 42, 12, UI_COL_SURFACE, UI_COL_SURFACE);
 
-  // 日期与星期
+  // 日期与星期 + 右侧摆件状态（睡眠定时 / 正在播放）
   char dateBuf[48];
   snprintf(dateBuf, sizeof(dateBuf), "%d年%02d月%02d日 %s",
            timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, getWeekDayName(timeinfo.tm_wday));
-  font_draw_string(24, 158, dateBuf, 0xFFDE, COLOR_PANEL_BG, 1);
+  font_draw_string_bold(24, 158, 198, dateBuf, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+
+  uint16_t remSec = power_get_sleep_timer_remaining_sec();
+  if (remSec > 0) {
+    char tBuf[20];
+    snprintf(tBuf, sizeof(tBuf), "定时%um", (unsigned)((remSec + 59) / 60));
+    ui_theme_draw_badge(228, 156, 68, 18, tBuf, M3_TERTIARY, M3_TERTIARY_CONTAINER);
+  } else if (player_get_state() == STATE_PLAYING || web_radio_is_playing()) {
+    ui_theme_draw_badge(228, 156, 68, 18, "▶ 播放", M3_ON_PRIMARY, M3_PRIMARY);
+  }
 
   // 城市与天气
   const WeatherInfo& winfo = weather_get_info();
   if (winfo.valid) {
-    char wBuf[48];
-    snprintf(wBuf, sizeof(wBuf), "%s %s %s", winfo.city, winfo.temp, winfo.desc);
-    font_draw_string(24, 175, wBuf, COLOR_ACCENT_GREEN, COLOR_PANEL_BG, 1);
+    char wBuf[56];
+    snprintf(wBuf, sizeof(wBuf), "%s %s %s %s", winfo.city, winfo.temp, winfo.desc, winfo.humidity);
+    font_draw_string_clipped(24, 175, 272, wBuf, M3_SAGE, UI_COL_SURFACE, 1);
   } else {
-    font_draw_string(24, 175, "点击此处可手动刷新天气", COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+    font_draw_string(24, 175, "点击此处刷新天气 (点顶部可配网)", UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
   }
 
-  // 5. 底部三大按钮 (y: 202, h: 34)
-  // [进入桌面]
-  tft.fillRoundRect(16, 201, 88, 34, 5, 0x10A2);
-  tft.drawRoundRect(16, 201, 88, 34, 5, COLOR_ACCENT_GREEN);
-  font_draw_string_center(60, 209, "进入桌面", COLOR_ACCENT_GREEN, 0x10A2, 1);
+  // 5. 底部 M3 悬浮胶囊功能栏 (x: 12, y: 201, w: 296, h: 34, r: 17)
+  tft.fillRoundRect(12, 201, 296, 34, 17, UI_COL_SURFACE_HIGH);
+  ui_theme_draw_badge(16, 204, 66, 28, "桌面", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_PRESS);
+  ui_theme_draw_badge(88, 204, 66, 28, "看板", M3_TERTIARY, M3_TERTIARY_CONTAINER);
 
-  // [模式切换: 看板]
-  tft.fillRoundRect(116, 201, 88, 34, 5, 0x10A2);
-  tft.drawRoundRect(116, 201, 88, 34, 5, COLOR_ACCENT_ORANGE);
-  font_draw_string_center(160, 209, "切换看板", COLOR_ACCENT_ORANGE, 0x10A2, 1);
+  bool alwaysOn = settings_get().clockAlwaysOn;
+  ui_theme_draw_badge(160, 204, 72, 28, alwaysOn ? "常亮:开" : "常亮:关",
+                      alwaysOn ? M3_PRIMARY : UI_COL_TEXT_MUTED,
+                      alwaysOn ? M3_PRIMARY_CONTAINER : UI_COL_SURFACE);
 
-  // [WiFi配网]
-  tft.fillRoundRect(216, 201, 88, 34, 5, 0x10A2);
-  tft.drawRoundRect(216, 201, 88, 34, 5, COLOR_ACCENT_CYAN);
-  font_draw_string_center(260, 209, "WiFi配网", COLOR_ACCENT_CYAN, 0x10A2, 1);
+  if (WiFi.status() == WL_CONNECTED) {
+    ui_theme_draw_badge(238, 204, 66, 28, s_nightDim ? "夜光:开" : "夜光:关",
+                        s_nightDim ? M3_ON_PRIMARY : UI_COL_TEXT_PRIMARY,
+                        s_nightDim ? M3_TERTIARY : UI_COL_SURFACE_PRESS);
+  } else {
+    ui_theme_draw_badge(238, 204, 66, 28, "配网", M3_PRIMARY, M3_PRIMARY_CONTAINER);
+  }
 }
 
 // 渲染原有数字信息看板界面
@@ -266,8 +276,11 @@ void clock_ui_update() {
     if (getLocalTime(&timeinfo, 10)) {
       if (timeinfo.tm_min != s_lastMin) {
         s_lastMin = timeinfo.tm_min;
-        // 分钟翻转时发出轻微复古机械咔哒音效
-        audio_test_beep(1400, 15);
+        // 仅在开启整点报时且白天 08:00~22:00 整点时轻微提示，平时保持安静桌面
+        if (settings_get().hourlyChime && timeinfo.tm_min == 0 &&
+            timeinfo.tm_hour >= 8 && timeinfo.tm_hour <= 22) {
+          audio_test_beep(1400, 20);
+        }
         renderCurrentClock();
       } else {
         // 秒级小刷新
@@ -275,16 +288,16 @@ void clock_ui_update() {
           TFT_eSPI& tft = display_get_tft();
           // 更新中间冒号闪烁
           bool secEven = (timeinfo.tm_sec % 2 == 0);
-          uint16_t colonCol = secEven ? COLOR_ACCENT_CYAN : 0x2124;
+          uint16_t colonCol = secEven ? M3_PRIMARY : UI_COL_SURFACE;
           int cardY = 28;
           tft.fillCircle(160, cardY + 36, 4, colonCol);
           tft.fillCircle(160, cardY + 72, 4, colonCol);
 
           // 更新秒级刻度条
           int secW = map(timeinfo.tm_sec, 0, 59, 0, 284);
-          tft.fillRoundRect(18, 142, 284, 5, 2, 0x10A2);
+          tft.fillRoundRect(18, 142, 284, 5, 2, UI_COL_SURFACE);
           if (secW > 0) {
-            tft.fillRoundRect(18, 142, secW, 5, 2, COLOR_ACCENT_CYAN);
+            tft.fillRoundRect(18, 142, secW, 5, 2, M3_PRIMARY);
           }
         } else {
           char timeStr[16];
@@ -304,18 +317,54 @@ void clock_ui_update() {
 }
 
 void clock_ui_handle_touch(int16_t x, int16_t y) {
-  // 1. 中间天气卡片点击刷新天气
-  if ((s_isFlipMode && y >= 152 && y <= 196) || (!s_isFlipMode && y >= 110 && y <= 176 && x >= 240)) {
-  if (true) {
-      audio_test_beep(1500, 40);
-      weather_fetch();
-      renderCurrentClock();
-      return;
-    }
+  // 0. 顶部 Wi-Fi 状态栏 (y <= 26, x <= 200) -> 随时触发 Wi-Fi 配网
+  if (y <= 26 && x <= 200) {
+    audio_test_beep(1800, 50);
+    net_start_config_portal();
+    return;
   }
 
-  // 2. 底部功能按键 (y >= 196)
-  if (y >= (s_isFlipMode ? 197 : 180)) {
+  // 1. 中间天气卡片点击刷新天气
+  if ((s_isFlipMode && y >= 152 && y <= 196) || (!s_isFlipMode && y >= 110 && y <= 176 && x >= 240)) {
+    audio_test_beep(1500, 40);
+    weather_fetch();
+    renderCurrentClock();
+    return;
+  }
+
+  // 2. 底部功能按键
+  if (s_isFlipMode && y >= 197) {
+    if (x >= 10 && x <= 84) {
+      audio_test_beep(1200, 30);
+      if (s_nightDim) {
+        s_nightDim = false;
+        display_set_brightness(settings_get().brightness);
+      }
+      ui_switch_to(UI_PAGE_HOME);
+    } else if (x >= 86 && x <= 158) {
+      audio_test_beep(1600, 40);
+      s_isFlipMode = false;
+      renderCurrentClock();
+    } else if (x >= 160 && x <= 236) {
+      audio_test_beep(1400, 35);
+      settings_get().clockAlwaysOn = !settings_get().clockAlwaysOn;
+      settings_save();
+      renderCurrentClock();
+    } else if (x >= 238 && x <= 312) {
+      if (WiFi.status() == WL_CONNECTED) {
+        audio_test_beep(1100, 30);
+        s_nightDim = !s_nightDim;
+        display_set_brightness(s_nightDim ? 15 : settings_get().brightness);
+        renderCurrentClock();
+      } else {
+        audio_test_beep(1800, 50);
+        net_start_config_portal();
+      }
+    }
+    return;
+  }
+
+  if (!s_isFlipMode && y >= 180) {
     // [进入桌面] (x: 10..106)
     if (x >= 10 && x <= 106) {
       audio_test_beep(1200, 30);
@@ -331,21 +380,16 @@ void clock_ui_handle_touch(int16_t x, int16_t y) {
       return;
     }
 
-    // 右侧按键: [WiFi配网] 或 [息屏休眠] (x: 214..310)
+    // [息屏休眠] (x: 214..310)
     if (x >= 214 && x <= 310) {
-      if (s_isFlipMode) {
-        audio_test_beep(1800, 50);
-        net_start_config_portal();
-      } else {
-        audio_test_beep(1000, 40);
-        display_sleep();
-      }
+      audio_test_beep(1000, 40);
+      display_sleep();
       return;
     }
   }
 
   // 点击上方卡片区域：快速切换翻页/看板模式
-  if (y < 160) {
+  if (y > 26 && y < 152) {
     audio_test_beep(1600, 30);
     s_isFlipMode = !s_isFlipMode;
     renderCurrentClock();

@@ -50,27 +50,25 @@ void ui_draw_header(const char* title, bool showBackBtn) {
   display_get_tft().setTextSize(1);
   TFT_eSPI& tft = display_get_tft();
 
-  // 顶部黑底区域 (高度 30px)
+  // M3 顶部沉浸式栏 (无生硬底部线条，靠色彩层级过渡)
   tft.fillRect(0, 0, 320, 30, UI_COL_BG);
-  tft.drawLine(0, 29, 320, 29, UI_COL_BORDER_SUBTLE);
 
-  // 返回按钮 (更精致的药丸胶囊)
+  // 返回胶囊按钮 (Material 3 Tonal Pill)
   if (showBackBtn) {
-    tft.fillRoundRect(6, 4, 58, 22, 4, UI_COL_SURFACE_HIGH);
-    tft.drawRoundRect(6, 4, 58, 22, 4, UI_COL_BORDER_LIGHT);
-    font_draw_string(14, 7, "< 返回", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH, 1);
+    tft.fillRoundRect(6, 4, 58, 22, 11, UI_COL_SURFACE_HIGH);
+    font_draw_string(14, 7, "< 返回", M3_PRIMARY, UI_COL_SURFACE_HIGH, 1);
   }
 
-  // 标题文字 (支持中文点阵渲染)
-  font_draw_string_clipped(showBackBtn ? 70 : 12, 7, showBackBtn ? 140 : 198, title, UI_COL_TEXT_PRIMARY, UI_COL_BG, 1);
+  // 粗体主标题文字
+  font_draw_string_bold(showBackBtn ? 70 : 12, 7, showBackBtn ? 140 : 198, title, UI_COL_TEXT_PRIMARY, UI_COL_BG, 1);
 
-  // 电池电量数值与小图标 (右侧)
+  // 电池电量数值与 M3 圆角电池图标 (右侧)
   char bBuf[24];
   uint8_t pct = battery_get_percent();
   float v = battery_get_voltage();
   bool usb = battery_is_usb_powered();
   snprintf(bBuf, sizeof(bBuf), "%d%% %.2fV", pct, v);
-  tft.setTextColor(battery_is_low() ? UI_COL_RED : (usb ? UI_COL_AMBER : UI_COL_TEXT_MUTED), UI_COL_BG);
+  tft.setTextColor(battery_is_low() ? UI_COL_RED : (usb ? M3_PRIMARY : UI_COL_TEXT_MUTED), UI_COL_BG);
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(1);
   tft.setTextSize(1);
@@ -78,11 +76,11 @@ void ui_draw_header(const char* title, bool showBackBtn) {
   tft.drawString(bBuf, bTextX, 11, 1);
 
   int bx = 278, by = 8, bw = 30, bh = 14;
-  tft.drawRoundRect(bx, by, bw, bh, 3, UI_COL_BORDER_LIGHT);
-  tft.fillRect(bx + bw, by + 4, 2, 6, UI_COL_BORDER_LIGHT);
+  tft.drawRoundRect(bx, by, bw, bh, 4, UI_COL_SURFACE_PRESS);
+  tft.fillRect(bx + bw, by + 4, 2, 6, UI_COL_SURFACE_PRESS);
   int fillW = map(pct, 0, 100, 0, bw - 4);
   fillW = constrain(fillW, 0, bw - 4);
-  uint16_t bCol = battery_is_low() ? UI_COL_RED : (usb ? UI_COL_AMBER : UI_COL_GREEN);
+  uint16_t bCol = battery_is_low() ? UI_COL_RED : (usb ? M3_PRIMARY : M3_SAGE);
   tft.fillRect(bx + 2, by + 2, fillW, bh - 4, bCol);
   tft.fillRect(bx + 2 + fillW, by + 2, (bw - 4) - fillW, bh - 4, UI_COL_BG);
 }

@@ -5,7 +5,14 @@
 #include "storage/sdcard.h"
 #include "storage/scanner.h"
 #include "reader/novel.h"
+#include "hardware/audio.h"
+#include "hardware/battery.h"
+#include "hardware/display.h"
+#include "player/player.h"
 #include "system/net_manager.h"
+#include "system/settings_manager.h"
+#include "system/power_manager.h"
+#include "system/weather.h"
 #include "config.h"
 
 static WebServer* s_server = nullptr;
@@ -20,29 +27,41 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CYD Plus 摆烂播放器 - 空中文件管理</title>
+<title>CYD Plus 摆烂播放器 - 桌面控制台与文件管理</title>
 <style>
 :root {
   --bg: #0d1117; --card: #161b22; --border: #30363d;
   --text: #c9d1d9; --heading: #f0f6fc; --accent: #58a6ff;
-  --green: #3fb950; --red: #f85149;
+  --green: #3fb950; --red: #f85149; --amber: #d29922;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 16px; line-height: 1.5; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 14px; line-height: 1.5; }
 .container { max-width: 680px; margin: 0 auto; }
-header { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
-h1 { color: var(--heading); font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+header { text-align: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+h1 { color: var(--heading); font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+h2 { color: var(--heading); font-size: 15px; font-weight: 600; margin-bottom: 10px; }
 .sub { font-size: 13px; color: #8b949e; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-.drop-zone { border: 2px dashed var(--accent); border-radius: 8px; padding: 26px 16px; text-align: center; cursor: pointer; transition: 0.2s; background: rgba(88, 166, 255, 0.04); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+.stat-row { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; margin-bottom: 10px; }
+.badge { background: #21262d; border: 1px solid var(--border); padding: 3px 8px; border-radius: 12px; color: var(--heading); }
+.ctrl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.ctrl-label { min-width: 72px; font-size: 13px; color: #8b949e; }
+input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+input[type=text], select, textarea { background: #0d1117; color: var(--heading); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+textarea { width: 100%; min-height: 92px; font-family: monospace; resize: vertical; }
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.btn { padding: 6px 10px; background: #21262d; border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 12px; }
+.btn.active { background: #1f6feb; border-color: #388bfd; color: #fff; }
+.btn.primary { background: #238636; border-color: #2ea043; color: #fff; }
+.drop-zone { border: 2px dashed var(--accent); border-radius: 8px; padding: 22px 14px; text-align: center; cursor: pointer; transition: 0.2s; background: rgba(88, 166, 255, 0.04); }
 .drop-zone:hover { background: rgba(88, 166, 255, 0.1); border-color: #79c0ff; }
 .drop-title { font-size: 15px; font-weight: 600; color: var(--heading); margin-bottom: 4px; }
 .drop-tip { font-size: 12px; color: #8b949e; }
 .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
 .tab-btn { flex: 1; padding: 8px 12px; background: #21262d; border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
 .tab-btn.active { background: #1f6feb; border-color: #388bfd; color: #fff; }
-.file-list { list-style: none; max-height: 320px; overflow-y: auto; }
-.file-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.file-list { list-style: none; max-height: 280px; overflow-y: auto; }
+.file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .file-item:last-child { border-bottom: none; }
 .file-name { color: var(--heading); font-weight: 500; word-break: break-all; margin-right: 8px; }
 .file-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -57,14 +76,88 @@ h1 { color: var(--heading); font-size: 20px; font-weight: 600; margin-bottom: 6p
 <body>
 <div class="container">
   <header>
-    <h1>📻 CYD Plus 空中无线文件管理</h1>
-    <p class="sub">无需拔插 TF 卡，直接通过网页拖拽上传歌曲与小说</p>
+    <h1>📻 CYD Plus 桌面摆件控制台</h1>
+    <p class="sub">远程遥控音量音效 · 时钟城市设置 · 自定义电台 · 无线传歌传书</p>
   </header>
+
+  <div class="card">
+    <h2>🎛 摆件状态与远程控制</h2>
+    <div class="stat-row">
+      <span class="badge" id="bBattery">电量: --</span>
+      <span class="badge" id="bTrack">状态: --</span>
+      <span class="badge" id="bSleep">定时: 关闭</span>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">音量 <b id="vLbl">70%</b></span>
+      <input type="range" id="volRange" min="0" max="100" step="5" value="70" onchange="sendCtrl({volume:this.value})">
+      <span class="ctrl-label" style="min-width:56px;">亮度 <b id="bLbl">80%</b></span>
+      <input type="range" id="briRange" min="10" max="100" step="5" value="80" onchange="sendCtrl({brightness:this.value})">
+    </div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">音效模式</span>
+      <div class="btn-group">
+        <button class="btn" id="eq0" onclick="sendCtrl({eq:0})">原声</button>
+        <button class="btn" id="eq1" onclick="sendCtrl({eq:1})">温暖低音</button>
+        <button class="btn" id="eq2" onclick="sendCtrl({eq:2})">清晰人声</button>
+      </div>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">睡眠定时</span>
+      <div class="btn-group">
+        <button class="btn" id="sl0" onclick="sendCtrl({sleep_min:0})">关闭</button>
+        <button class="btn" id="sl15" onclick="sendCtrl({sleep_min:15})">15分</button>
+        <button class="btn" id="sl30" onclick="sendCtrl({sleep_min:30})">30分</button>
+        <button class="btn" id="sl60" onclick="sendCtrl({sleep_min:60})">60分</button>
+      </div>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">本地播放</span>
+      <div class="btn-group">
+        <button class="btn" onclick="sendCtrl({cmd:'prev'})">上一首</button>
+        <button class="btn primary" onclick="sendCtrl({cmd:'toggle'})">播放 / 暂停</button>
+        <button class="btn" onclick="sendCtrl({cmd:'next'})">下一首</button>
+        <button class="btn" id="clkBtn" onclick="toggleAlwaysOn()">时钟常亮</button>
+        <button class="btn" id="chimeBtn" onclick="toggleChime()">整点报时</button>
+      </div>
+    </div>
+
+    <div class="ctrl-row" style="margin-bottom:0;">
+      <span class="ctrl-label">天气城市</span>
+      <select id="cityPreset" onchange="applyPresetCity(this.value)">
+        <option value="">常用城市快捷选...</option>
+        <option value="101110506|富平县">富平县 (101110506)</option>
+        <option value="101110101|西安">西安 (101110101)</option>
+        <option value="101010100|北京">北京 (101010100)</option>
+        <option value="101020100|上海">上海 (101020100)</option>
+        <option value="101280101|广州">广州 (101280101)</option>
+        <option value="101280601|深圳">深圳 (101280601)</option>
+        <option value="101210101|杭州">杭州 (101210101)</option>
+        <option value="101270101|成都">成都 (101270101)</option>
+      </select>
+      <input type="text" id="cityName" placeholder="城市名" style="width:76px;">
+      <input type="text" id="cityCode" placeholder="9位代码" style="width:94px;">
+      <button class="btn primary" onclick="saveCity()">同步天气</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📡 自定义网络电台 (/radio.txt)</h2>
+    <p class="sub" style="margin-bottom:8px;">每行一条，格式：<b>台名|流派|http://音频流地址</b>（保存后在网络收音机自动生效）</p>
+    <textarea id="radioTxt" placeholder="例如：&#10;怀旧金曲|华语|http://stream.zeno.fm/f3wvbbqmdg8uv"></textarea>
+    <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+      <button class="btn primary" onclick="saveRadio()">保存电台列表</button>
+      <span class="sub" id="radioMsg"></span>
+    </div>
+  </div>
 
   <div class="card">
     <div class="drop-zone" id="dropZone">
       <div class="drop-title">📂 点击或拖拽文件至此处上传</div>
-      <div class="drop-tip">支持 MP3/WAV 音频（存入曲库）与 TXT 文本（存入 /novel/ 小说）</div>
+      <div class="drop-tip">支持 MP3/WAV 音频（存入曲库）与 TXT 文本（自动存入 /novel/；radio.txt 存入根目录）</div>
       <input type="file" id="fileInput" multiple style="display:none">
     </div>
     <div class="progress-bar" id="pBar"><div class="progress-fill" id="pFill"></div></div>
@@ -84,6 +177,7 @@ h1 { color: var(--heading); font-size: 20px; font-weight: 600; margin-bottom: 6p
 
 <script>
 let curDir = '/';
+let curState = { clockAlwaysOn: false, hourlyChime: false };
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const pBar = document.getElementById('pBar');
@@ -100,6 +194,64 @@ dropZone.ondrop = (e) => {
   dropZone.style.borderColor = 'var(--accent)';
   if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
 };
+
+async function loadStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const st = await res.json();
+    curState = st;
+    document.getElementById('bBattery').innerText = `电量: ${st.batteryPct}% (${st.batteryV}V)`;
+    document.getElementById('bTrack').innerText = st.playing ? `播放: ${st.track}` : `待机: ${st.track}`;
+    document.getElementById('bSleep').innerText = st.sleepRemSec > 0 ? `定时: 剩${Math.ceil(st.sleepRemSec/60)}分` : '定时: 关闭';
+    document.getElementById('volRange').value = st.volume;
+    document.getElementById('vLbl').innerText = st.volume + '%';
+    document.getElementById('briRange').value = st.brightness;
+    document.getElementById('bLbl').innerText = st.brightness + '%';
+    [0,1,2].forEach(i => document.getElementById('eq'+i).className = 'btn' + (st.eq === i ? ' active' : ''));
+    [0,15,30,60].forEach(m => document.getElementById('sl'+m).className = 'btn' + (st.sleepMin === m ? ' active' : ''));
+    document.getElementById('clkBtn').className = 'btn' + (st.clockAlwaysOn ? ' active' : '');
+    document.getElementById('chimeBtn').className = 'btn' + (st.hourlyChime ? ' active' : '');
+    if (!document.getElementById('cityCode').value) {
+      document.getElementById('cityName').value = st.cityName || '';
+      document.getElementById('cityCode').value = st.cityCode || '';
+    }
+  } catch (e) {}
+}
+
+async function sendCtrl(params) {
+  const q = new URLSearchParams(params).toString();
+  await fetch('/api/control?' + q, { method: 'POST' });
+  loadStatus();
+}
+
+function toggleAlwaysOn() { sendCtrl({ clock_always_on: curState.clockAlwaysOn ? 0 : 1 }); }
+function toggleChime() { sendCtrl({ hourly_chime: curState.hourlyChime ? 0 : 1 }); }
+function applyPresetCity(val) {
+  if (!val) return;
+  const [cd, nm] = val.split('|');
+  document.getElementById('cityCode').value = cd;
+  document.getElementById('cityName').value = nm;
+}
+async function saveCity() {
+  const city_code = document.getElementById('cityCode').value.trim();
+  const city_name = document.getElementById('cityName').value.trim();
+  if (!city_code) return alert('请输入城市代码');
+  await sendCtrl({ city_code, city_name });
+  alert('城市已保存并请求刷新天气');
+}
+
+async function loadRadio() {
+  try {
+    const res = await fetch('/api/radio');
+    document.getElementById('radioTxt').value = await res.text();
+  } catch (e) {}
+}
+async function saveRadio() {
+  const txt = document.getElementById('radioTxt').value;
+  const res = await fetch('/api/radio', { method: 'POST', body: txt });
+  const j = await res.json();
+  document.getElementById('radioMsg').innerText = j.status === 'ok' ? '已保存至 TF 卡 /radio.txt' : '保存失败(需挂载TF卡)';
+}
 
 function switchTab(dir) {
   curDir = dir;
@@ -186,7 +338,10 @@ async function handleFiles(files) {
   loadFiles();
 }
 
+loadStatus();
+loadRadio();
 loadFiles();
+setInterval(loadStatus, 4000);
 </script>
 </body>
 </html>
@@ -242,7 +397,9 @@ static void handleFileUpload() {
     if (slash >= 0) filename = filename.substring(slash + 1);
 
     String destPath = "/";
-    if (filename.endsWith(".txt") || filename.endsWith(".TXT")) {
+    if (filename.equalsIgnoreCase("radio.txt")) {
+      destPath = "/radio.txt";
+    } else if (filename.endsWith(".txt") || filename.endsWith(".TXT")) {
       if (!SD.exists("/novel")) SD.mkdir("/novel");
       destPath = "/novel/" + filename;
     } else {
@@ -295,6 +452,142 @@ static void handleFileDelete() {
   s_server->send(200, "application/json", ok ? "{\"status\":\"ok\"}" : "{\"status\":\"fail\"}");
 }
 
+static String jsonEscape(const char* src) {
+  if (!src) return "";
+  String out;
+  for (const char* p = src; *p; p++) {
+    if (*p == '"' || *p == '\\') out += '\\';
+    out += *p;
+  }
+  return out;
+}
+
+static void handleStatus() {
+  if (!s_server) return;
+  SystemSettings& cfg = settings_get();
+  const TrackInfo* t = player_get_current_track();
+  String trackName = (t && strlen(t->title) > 0) ? jsonEscape(t->title) : "无曲目";
+  String cityName = jsonEscape(cfg.weatherCityName);
+  String cityCode = jsonEscape(cfg.weatherCityCode);
+
+  char buf[512];
+  snprintf(buf, sizeof(buf),
+           "{\"volume\":%u,\"brightness\":%u,\"eq\":%u,\"sleepMin\":%u,"
+           "\"sleepRemSec\":%u,\"clockAlwaysOn\":%s,\"hourlyChime\":%s,"
+           "\"batteryPct\":%u,\"batteryV\":\"%.2f\",\"playing\":%s,"
+           "\"track\":\"%s\",\"cityName\":\"%s\",\"cityCode\":\"%s\"}",
+           cfg.volume, cfg.brightness, (unsigned)audio_get_eq(),
+           (unsigned)power_get_sleep_timer_minutes(),
+           (unsigned)power_get_sleep_timer_remaining_sec(),
+           cfg.clockAlwaysOn ? "true" : "false",
+           cfg.hourlyChime ? "true" : "false",
+           battery_get_percent(), battery_get_voltage(),
+           (player_get_state() == STATE_PLAYING) ? "true" : "false",
+           trackName.c_str(), cityName.c_str(), cityCode.c_str());
+  s_server->send(200, "application/json", buf);
+}
+
+static void handleControl() {
+  if (!s_server) return;
+  SystemSettings& cfg = settings_get();
+  bool needSave = false;
+
+  if (s_server->hasArg("volume")) {
+    int v = constrain(s_server->arg("volume").toInt(), 0, 100);
+    cfg.volume = (uint8_t)v;
+    audio_set_volume(cfg.volume);
+    needSave = true;
+  }
+  if (s_server->hasArg("brightness")) {
+    int b = constrain(s_server->arg("brightness").toInt(), 5, 100);
+    cfg.brightness = (uint8_t)b;
+    display_set_brightness(cfg.brightness);
+    needSave = true;
+  }
+  if (s_server->hasArg("eq")) {
+    int eq = constrain(s_server->arg("eq").toInt(), 0, 2);
+    cfg.eqMode = (uint8_t)eq;
+    audio_set_eq((AudioEQMode)eq);
+    needSave = true;
+  }
+  if (s_server->hasArg("sleep_min")) {
+    int m = constrain(s_server->arg("sleep_min").toInt(), 0, 240);
+    power_set_sleep_timer((uint16_t)m);
+  }
+  if (s_server->hasArg("clock_always_on")) {
+    cfg.clockAlwaysOn = (s_server->arg("clock_always_on").toInt() != 0);
+    needSave = true;
+  }
+  if (s_server->hasArg("hourly_chime")) {
+    cfg.hourlyChime = (s_server->arg("hourly_chime").toInt() != 0);
+    needSave = true;
+  }
+  if (s_server->hasArg("city_code")) {
+    String cd = s_server->arg("city_code");
+    cd.trim();
+    if (cd.length() >= 5 && cd.length() < sizeof(cfg.weatherCityCode)) {
+      snprintf(cfg.weatherCityCode, sizeof(cfg.weatherCityCode), "%s", cd.c_str());
+      if (s_server->hasArg("city_name")) {
+        String nm = s_server->arg("city_name");
+        nm.trim();
+        if (nm.length() > 0) {
+          snprintf(cfg.weatherCityName, sizeof(cfg.weatherCityName), "%s", nm.c_str());
+        }
+      }
+      settings_save();
+      needSave = false;
+      weather_fetch();
+    }
+  }
+  if (s_server->hasArg("cmd")) {
+    String cmd = s_server->arg("cmd");
+    if (cmd == "prev") player_prev();
+    else if (cmd == "next") player_next();
+    else if (cmd == "toggle") player_toggle();
+  }
+
+  if (needSave) settings_save();
+  s_server->send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
+static void handleRadioGet() {
+  if (!s_server) return;
+  if (!sdcard_is_available() || !SD.exists("/radio.txt")) {
+    s_server->send(200, "text/plain",
+                   "# 格式: 台名|流派|http://流地址\n"
+                   "经典流行金曲|华语流行|http://stream.zeno.fm/f3wvbbqmdg8uv\n"
+                   "Lo-Fi 治愈轻音|学习专注|http://stream.zeno.fm/4v7rz7hbg8uv\n");
+    return;
+  }
+  File f = SD.open("/radio.txt", FILE_READ);
+  if (!f) {
+    s_server->send(500, "text/plain", "");
+    return;
+  }
+  String content = f.readString();
+  f.close();
+  s_server->send(200, "text/plain; charset=utf-8", content);
+}
+
+static void handleRadioPost() {
+  if (!s_server) return;
+  if (!sdcard_is_available()) {
+    s_server->send(500, "application/json", "{\"status\":\"no_sd\"}");
+    return;
+  }
+  String body = s_server->arg("plain");
+  if (SD.exists("/radio.txt")) SD.remove("/radio.txt");
+  File f = SD.open("/radio.txt", FILE_WRITE);
+  if (!f) {
+    s_server->send(500, "application/json", "{\"status\":\"fail\"}");
+    return;
+  }
+  f.print(body);
+  f.close();
+  snprintf(s_lastAction, sizeof(s_lastAction), "已更新自定义电台 /radio.txt");
+  s_server->send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
 void web_file_manager_init() {
 }
 
@@ -305,6 +598,10 @@ void web_file_manager_start() {
   if (!s_server) {
     s_server = new WebServer(80);
     s_server->on("/", HTTP_GET, handleRoot);
+    s_server->on("/api/status", HTTP_GET, handleStatus);
+    s_server->on("/api/control", HTTP_POST, handleControl);
+    s_server->on("/api/radio", HTTP_GET, handleRadioGet);
+    s_server->on("/api/radio", HTTP_POST, handleRadioPost);
     s_server->on("/api/list", HTTP_GET, handleFileList);
     s_server->on("/api/upload", HTTP_POST, handleUploadFinish, handleFileUpload);
     s_server->on("/api/delete", HTTP_POST, handleFileDelete);

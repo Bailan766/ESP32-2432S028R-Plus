@@ -29,7 +29,7 @@ static void renderList() {
   ui_draw_header(headerBuf, true);
 
   if (!s_isRecent) {
-    ui_theme_draw_pill_btn(154, 4, 58, 22, "重扫", UI_COL_AMBER, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+    ui_theme_draw_badge(154, 4, 58, 22, "重扫", M3_PRIMARY, M3_PRIMARY_CONTAINER);
   }
 
   int startIndex = s_currentPage * ITEMS_PER_PAGE;
@@ -37,7 +37,7 @@ static void renderList() {
   if (totalItems == 0) {
     if (!s_isRecent && !sdcard_is_available()) {
       font_draw_string_center(160, 80, "未检测到TF卡 (使用内置演示曲)", UI_COL_TEXT_MUTED, UI_COL_BG, 1);
-      ui_theme_draw_pill_btn(80, 110, 160, 38, "点击手动挂载TF卡", UI_COL_AMBER, UI_COL_SURFACE, UI_COL_BORDER_LIGHT);
+      ui_theme_draw_pill_btn(80, 110, 160, 38, "点击手动挂载TF卡", M3_ON_PRIMARY, M3_PRIMARY, M3_PRIMARY);
     } else {
       font_draw_string_center(160, 110, s_isRecent ? "暂无最近播放记录" : "曲库为空 (使用内置曲目)", UI_COL_TEXT_MUTED, UI_COL_BG, 1);
     }
@@ -51,44 +51,45 @@ static void renderList() {
 
       int y = 33 + i * 39;
       bool isCur = (player_get_current_track() && player_get_current_track()->id == track->id);
+      uint16_t cardBg = isCur ? M3_PRIMARY_CONTAINER : UI_COL_SURFACE;
 
-      tft.fillRoundRect(10, y, 300, 36, 5, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE);
-      tft.drawRoundRect(10, y, 300, 36, 5, isCur ? UI_COL_BORDER_LIGHT : UI_COL_BORDER_SUBTLE);
+      // M3 大圆角列表项 (10px, 无框色调区分)
+      ui_theme_draw_panel(10, y, 300, 36, 10, cardBg, cardBg);
 
-      if (isCur) {
-        // 当前播放高亮指示条
-        tft.fillRect(12, y + 6, 3, 24, UI_COL_AMBER);
-      }
+      // 左侧音符图标衬底
+      ui_theme_draw_icon_badge(28, y + 18, 24,
+                               isCur ? M3_HERO_START : UI_COL_SURFACE_HIGH,
+                               isCur ? M3_ON_PRIMARY : M3_PRIMARY,
+                               M3_ICON_NOTE, isCur);
 
-      // 序号与曲目名 (支持中文渲染)
+      // 序号与曲目名 (粗体大标题 + 暖灰副标题)
       char titleBuf[48];
       snprintf(titleBuf, sizeof(titleBuf), "%02d. %s", track->id + 1, track->title);
-      font_draw_string_clipped(20, y + 4, 240, titleBuf, isCur ? UI_COL_AMBER : UI_COL_TEXT_PRIMARY, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE, 1);
+      font_draw_string_bold(46, y + 3, 198, titleBuf, isCur ? M3_HERO_START : UI_COL_TEXT_PRIMARY, cardBg, 1);
 
-      // 艺术家与时长
       char subBuf[48];
-      snprintf(subBuf, sizeof(subBuf), "%s | %02d:%02d",
+      snprintf(subBuf, sizeof(subBuf), "%s · %02d:%02d",
                track->artist, track->durationSec / 60, track->durationSec % 60);
-      font_draw_string_clipped(20, y + 20, 240, subBuf, UI_COL_TEXT_MUTED, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE, 1);
+      font_draw_string_clipped(46, y + 19, 198, subBuf, isCur ? M3_PRIMARY : UI_COL_TEXT_MUTED, cardBg, 1);
 
-      // 右侧播放箭头
-      font_draw_string(266, y + 10, isCur ? "播放中" : "▶", isCur ? UI_COL_AMBER : UI_COL_TEXT_DIM, isCur ? UI_COL_SURFACE_HIGH : UI_COL_SURFACE, 1);
+      // 右侧胶囊徽章
+      if (isCur) {
+        ui_theme_draw_badge(250, y + 8, 52, 20, "播放中", M3_ON_PRIMARY, M3_HERO_START);
+      } else {
+        ui_theme_draw_badge(276, y + 8, 26, 20, "▶", M3_PRIMARY, UI_COL_SURFACE_HIGH);
+      }
     }
   }
 
-  // 底部翻页栏
-  tft.drawLine(0, 192, 320, 192, UI_COL_BORDER_SUBTLE);
+  // M3 悬浮胶囊翻页栏 (y: 196, h: 36, r: 18)
+  tft.fillRoundRect(10, 196, 300, 36, 18, UI_COL_SURFACE_HIGH);
+  ui_theme_draw_badge(15, 200, 88, 28, "< 上一页", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_PRESS);
 
-  // 上一页按钮
-  ui_theme_draw_pill_btn(10, 196, 88, 38, "< 上一页", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
-
-  // 页码显示
   char pageBuf[16];
   snprintf(pageBuf, sizeof(pageBuf), "%d / %d", s_currentPage + 1, totalPages);
-  font_draw_string_center(160, 206, pageBuf, UI_COL_AMBER, UI_COL_BG, 1);
+  ui_theme_draw_badge(126, 200, 68, 28, pageBuf, M3_PRIMARY, M3_PRIMARY_CONTAINER);
 
-  // 下一页按钮
-  ui_theme_draw_pill_btn(222, 196, 88, 38, "下一页 >", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
+  ui_theme_draw_badge(217, 200, 88, 28, "下一页 >", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_PRESS);
 }
 
 void music_list_enter(bool isRecentMode) {

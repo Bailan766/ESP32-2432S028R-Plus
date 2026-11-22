@@ -22,11 +22,19 @@ void settings_init() {
   s_settings.bootCalibrate = false; // 严禁自动进入校准，仅物理长按 BOOT 键触发
   s_settings.lastTrackId = s_prefs.getInt("last_t", 0);
   s_settings.lastPositionSec = s_prefs.getUShort("last_p", 0);
+  s_settings.eqMode = s_prefs.getUChar("eq", 0);
+  if (s_settings.eqMode > 2) s_settings.eqMode = 0;
+  s_settings.clockAlwaysOn = s_prefs.getBool("clk_on", false);
+  s_settings.hourlyChime = s_prefs.getBool("chime", false);
+  String cityCd = s_prefs.getString("city_cd", "101110506");
+  String cityNm = s_prefs.getString("city_nm", "富平县");
+  snprintf(s_settings.weatherCityCode, sizeof(s_settings.weatherCityCode), "%s", cityCd.c_str());
+  snprintf(s_settings.weatherCityName, sizeof(s_settings.weatherCityName), "%s", cityNm.c_str());
 
-  LOG_SYS("配置加载完成: 音量=%d%%, 亮度=%d%%, 息屏=%ds, 方向=%d, 开机校准=%s, 播放模式=%d, 断点续播=%s",
+  LOG_SYS("配置加载完成: 音量=%d%%, 亮度=%d%%, 息屏=%ds, 音效=%d, 时钟常亮=%s, 城市=%s(%s)",
           s_settings.volume, s_settings.brightness, s_settings.autoSleepSeconds,
-          s_settings.screenRotation, s_settings.bootCalibrate ? "ON" : "OFF",
-          s_settings.playMode, s_settings.resumeEnable ? "ON" : "OFF");
+          s_settings.eqMode, s_settings.clockAlwaysOn ? "ON" : "OFF",
+          s_settings.weatherCityName, s_settings.weatherCityCode);
 }
 
 SystemSettings& settings_get() {
@@ -44,6 +52,11 @@ void settings_save() {
   s_prefs.putBool("boot_cal", s_settings.bootCalibrate);
   s_prefs.putInt("last_t", s_settings.lastTrackId);
   s_prefs.putUShort("last_p", s_settings.lastPositionSec);
+  s_prefs.putUChar("eq", s_settings.eqMode);
+  s_prefs.putBool("clk_on", s_settings.clockAlwaysOn);
+  s_prefs.putBool("chime", s_settings.hourlyChime);
+  s_prefs.putString("city_cd", s_settings.weatherCityCode);
+  s_prefs.putString("city_nm", s_settings.weatherCityName);
 }
 
 void settings_save_playback_position(int trackId, uint16_t positionSec) {

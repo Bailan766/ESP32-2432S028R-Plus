@@ -3,8 +3,11 @@
 #include "bluetooth/bt_sink.h"
 #include "hardware/display.h"
 #include "hardware/audio.h"
+#include "system/settings_manager.h"
+#include "system/power_manager.h"
 #include "ui/font_cn.h"
 #include "ui/ui.h"
+#include "ui/ui_theme.h"
 #include "config.h"
 
 static BTSinkState s_lastState = (BTSinkState)-1;
@@ -13,36 +16,55 @@ static char s_lastArtist[64] = "";
 static unsigned long s_lastAnimUpdate = 0;
 static uint8_t s_barHeights[16] = {0};
 
+static void renderQuickBar() {
+  TFT_eSPI& tft = display_get_tft();
+  int y = 150, h = 26;
+  tft.fillRect(14, y, 292, h, UI_COL_BG);
+
+  // 音量 - / 数值 / +
+  ui_theme_draw_badge(14, y, 46, h, "音-", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH);
+  char volBuf[12];
+  snprintf(volBuf, sizeof(volBuf), "%d%%", settings_get().volume);
+  ui_theme_draw_badge(62, y, 40, h, volBuf, M3_PRIMARY, UI_COL_SURFACE);
+  ui_theme_draw_badge(104, y, 46, h, "音+", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH);
+
+  // 音效 EQ 切换
+  char eqBuf[24];
+  snprintf(eqBuf, sizeof(eqBuf), "音效:%s", audio_get_eq_name(audio_get_eq()));
+  ui_theme_draw_badge(156, y, 86, h, eqBuf, M3_PRIMARY, M3_PRIMARY_CONTAINER);
+
+  // 睡眠定时切换
+  uint16_t remSec = power_get_sleep_timer_remaining_sec();
+  char tmBuf[16];
+  if (remSec > 0) {
+    uint16_t remMin = (remSec + 59) / 60;
+    snprintf(tmBuf, sizeof(tmBuf), "定%um", (unsigned)remMin);
+    ui_theme_draw_badge(248, y, 58, h, tmBuf, M3_TERTIARY, M3_TERTIARY_CONTAINER);
+  } else {
+    ui_theme_draw_badge(248, y, 58, h, "定时:关", UI_COL_TEXT_MUTED, UI_COL_SURFACE);
+  }
+}
+
 static void renderStaticUI() {
   TFT_eSPI& tft = display_get_tft();
-  tft.fillScreen(COLOR_BG_DARK);
+  tft.fillScreen(UI_COL_BG);
 
   ui_draw_header("蓝牙音箱模式", true);
 
-  // 1. 中央大信息卡片 (x: 14, y: 36, w: 292, h: 130)
-  tft.fillRoundRect(14, 36, 292, 130, 8, COLOR_PANEL_BG);
-  tft.drawRoundRect(14, 36, 292, 130, 8, COLOR_ACCENT_CYAN);
+  // 1. 中央 M3 大圆角色调卡片 (x: 14, y: 34, w: 292, h: 112, r: 14, 无生硬边框)
+  ui_theme_draw_panel(14, 34, 292, 112, 14, UI_COL_SURFACE, UI_COL_SURFACE);
 
-  // 2. 底部控制按钮 (x: 14..306, y: 176..224)
-  // [上一曲] (x: 14, y: 176, w: 64, h: 46)
-  tft.fillRoundRect(14, 176, 64, 46, 6, 0x10A2);
-  tft.drawRoundRect(14, 176, 64, 46, 6, COLOR_PANEL_BORDER);
-  font_draw_string_center(46, 189, "|<<", COLOR_TEXT_PRIMARY, 0x10A2, 1);
+  // 左侧 M3 有机蓝牙徽标底衬
+  ui_theme_draw_icon_badge(38, 60, 28, M3_PRIMARY_CONTAINER, M3_PRIMARY, M3_ICON_BT, true);
 
-  // [播放/暂停] (x: 86, y: 176, w: 96, h: 46)
-  tft.fillRoundRect(86, 176, 96, 46, 6, 0x05E0);
-  tft.drawRoundRect(86, 176, 96, 46, 6, COLOR_ACCENT_GREEN);
-  font_draw_string_center(134, 189, "播放/暂停", TFT_WHITE, 0x05E0, 1);
+  // 2. 快捷功能栏 (y: 150, h: 26): 音量 / 音效 / 睡眠定时
+  renderQuickBar();
 
-  // [下一曲] (x: 190, y: 176, w: 64, h: 46)
-  tft.fillRoundRect(190, 176, 64, 46, 6, 0x10A2);
-  tft.drawRoundRect(190, 176, 64, 46, 6, COLOR_PANEL_BORDER);
-  font_draw_string_center(222, 189, ">>|", COLOR_TEXT_PRIMARY, 0x10A2, 1);
-
-  // [重置] (x: 262, y: 176, w: 44, h: 46)
-  tft.fillRoundRect(262, 176, 44, 46, 6, 0x2104);
-  tft.drawRoundRect(262, 176, 44, 46, 6, COLOR_ACCENT_ORANGE);
-  font_draw_string_center(284, 189, "重连", COLOR_ACCENT_ORANGE, 0x2104, 1);
+  // 3. 底部 M3 胶囊控制按钮 (x: 14..306, y: 182..228, 全半圆胶囊)
+  ui_theme_draw_badge(14, 182, 64, 46, "|<<", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH);
+  ui_theme_draw_badge(86, 182, 96, 46, "播放/暂停", M3_ON_PRIMARY, M3_PRIMARY);
+  ui_theme_draw_badge(190, 182, 64, 46, ">>|", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH);
+  ui_theme_draw_badge(262, 182, 44, 46, "重连", M3_TERTIARY, M3_TERTIARY_CONTAINER);
 
   s_lastState = (BTSinkState)-1;
   s_lastTitle[0] = '\0';
@@ -55,42 +77,42 @@ static void renderDynamicInfo() {
   const char* curTitle = bt_sink_get_title();
   const char* curArtist = bt_sink_get_artist();
 
-  // 1. 状态指示更新
+  // 1. M3 状态胶囊徽章更新 (避开左侧蓝牙图标)
   if (st != s_lastState) {
     s_lastState = st;
-    tft.fillRect(24, 44, 270, 20, COLOR_PANEL_BG);
+    tft.fillRect(58, 40, 236, 22, UI_COL_SURFACE);
 
-    uint16_t badgeColor = COLOR_ACCENT_ORANGE;
-    const char* statusStr = "等待手机蓝牙连接...";
+    uint16_t badgeFg = M3_TERTIARY;
+    uint16_t badgeBg = M3_TERTIARY_CONTAINER;
+    const char* statusStr = "等待手机连接";
     if (st == BT_STATE_CONNECTING) {
-      badgeColor = TFT_YELLOW;
-      statusStr = "正在与手机握手配对...";
+      badgeFg = M3_ON_PRIMARY;
+      badgeBg = M3_HERO_START;
+      statusStr = "正在握手配对";
     } else if (st == BT_STATE_CONNECTED) {
-      badgeColor = COLOR_ACCENT_CYAN;
-      statusStr = "手机已连接 (就绪)";
+      badgeFg = M3_PRIMARY;
+      badgeBg = M3_PRIMARY_CONTAINER;
+      statusStr = "手机已连接";
     } else if (st == BT_STATE_PLAYING) {
-      badgeColor = COLOR_ACCENT_GREEN;
-      statusStr = "正在接收播放音频流";
+      badgeFg = M3_ON_PRIMARY;
+      badgeBg = M3_SAGE;
+      statusStr = "正在播放音频";
     }
 
-    tft.fillCircle(30, 52, 4, badgeColor);
-    font_draw_string(40, 46, statusStr, badgeColor, COLOR_PANEL_BG, 1);
+    ui_theme_draw_badge(60, 41, 118, 20, statusStr, badgeFg, badgeBg);
   }
 
-  // 2. 设备名与歌曲元数据更新
+  // 2. 设备名与粗体歌曲标题
   if (strcmp(curTitle, s_lastTitle) != 0 || strcmp(curArtist, s_lastArtist) != 0) {
     strncpy(s_lastTitle, curTitle, sizeof(s_lastTitle) - 1);
     strncpy(s_lastArtist, curArtist, sizeof(s_lastArtist) - 1);
 
-    tft.fillRect(24, 68, 270, 44, COLOR_PANEL_BG);
+    tft.fillRect(60, 64, 236, 40, UI_COL_SURFACE);
+    font_draw_string_bold(60, 64, 234, curTitle, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
 
-    // 歌曲名
-    font_draw_string_clipped(24, 68, 270, curTitle, COLOR_TEXT_PRIMARY, COLOR_PANEL_BG, 1);
-
-    // 歌手与设备广播名
     char infoBuf[64];
-    snprintf(infoBuf, sizeof(infoBuf), "%s | 蓝牙名: %s", curArtist, bt_sink_get_device_name());
-    font_draw_string_clipped(24, 92, 270, infoBuf, COLOR_TEXT_MUTED, COLOR_PANEL_BG, 1);
+    snprintf(infoBuf, sizeof(infoBuf), "%s · %s", curArtist, bt_sink_get_device_name());
+    font_draw_string_clipped(60, 84, 234, infoBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
   }
 }
 
@@ -103,8 +125,8 @@ static void renderSpectrumBars() {
   const int BAR_W = 12;
   const int BAR_GAP = 5;
   const int START_X = 22;
-  const int BASE_Y = 158;
-  const int MAX_H = 34;
+  const int BASE_Y = 140;
+  const int MAX_H = 30;
 
   for (int i = 0; i < NUM_BARS; i++) {
     uint8_t targetH = 3;
@@ -129,13 +151,13 @@ static void renderSpectrumBars() {
     // 清除上一次绘制的高处残影
     tft.fillRect(bx, BASE_Y - MAX_H, BAR_W, MAX_H - h, COLOR_PANEL_BG);
 
-    // 渐变色彩柱
-    uint16_t barCol = COLOR_ACCENT_CYAN;
-    if (h > 26) barCol = 0xF800; // 红色
-    else if (h > 18) barCol = 0xFD20; // 橙黄
-    else if (h > 10) barCol = 0x07E0; // 翠绿
+    // M3 暖玫瑰色阶频谱柱
+    uint16_t barCol = M3_PRIMARY_CONTAINER;
+    if (h > 22) barCol = M3_HERO_START;
+    else if (h > 14) barCol = M3_HERO_END;
+    else if (h > 8) barCol = M3_PRIMARY;
 
-    tft.fillRect(bx, by, BAR_W, h, barCol);
+    tft.fillRoundRect(bx, by, BAR_W, h, 3, barCol);
   }
 
   if (bt_sink_get_state() == BT_STATE_PLAYING) {
@@ -151,7 +173,18 @@ void bt_speaker_ui_enter() {
 }
 
 void bt_speaker_ui_update() {
+  static unsigned long s_lastTimerCheck = 0;
+  static uint16_t s_lastRemMin = 0;
   renderDynamicInfo();
+
+  if (millis() - s_lastTimerCheck >= 2000) {
+    s_lastTimerCheck = millis();
+    uint16_t remMin = (power_get_sleep_timer_remaining_sec() + 59) / 60;
+    if (remMin != s_lastRemMin) {
+      s_lastRemMin = remMin;
+      renderQuickBar();
+    }
+  }
 
   if (millis() - s_lastAnimUpdate >= 60) {
     s_lastAnimUpdate = millis();
@@ -168,8 +201,41 @@ void bt_speaker_ui_handle_touch(int16_t x, int16_t y) {
     return;
   }
 
-  // 2. 底部控制按钮 (y: 170..230)
-  if (y >= 170 && y <= 230) {
+  // 2. 快捷功能栏 (y: 146..178)
+  if (y >= 146 && y <= 178) {
+    SystemSettings& cfg = settings_get();
+    if (x >= 10 && x <= 60) {
+      // [音-]
+      int v = (int)cfg.volume - 10;
+      if (v < 0) v = 0;
+      cfg.volume = (uint8_t)v;
+      audio_set_volume(cfg.volume);
+      settings_save();
+      renderQuickBar();
+    } else if (x >= 102 && x <= 152) {
+      // [音+]
+      int v = (int)cfg.volume + 10;
+      if (v > 100) v = 100;
+      cfg.volume = (uint8_t)v;
+      audio_set_volume(cfg.volume);
+      settings_save();
+      renderQuickBar();
+    } else if (x >= 154 && x <= 244) {
+      // [音效 EQ]
+      AudioEQMode eq = audio_cycle_eq();
+      cfg.eqMode = (uint8_t)eq;
+      settings_save();
+      renderQuickBar();
+    } else if (x >= 246 && x <= 310) {
+      // [睡眠定时]
+      power_cycle_sleep_timer();
+      renderQuickBar();
+    }
+    return;
+  }
+
+  // 3. 底部控制按钮 (y: 180..234)
+  if (y >= 180 && y <= 234) {
     if (x >= 14 && x <= 78) {
       // [上一曲]
       audio_test_beep(1500, 30);

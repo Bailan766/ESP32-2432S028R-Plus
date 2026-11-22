@@ -63,9 +63,10 @@ void setup() {
   // 5. 初始化实体按键 (BOOT GPIO 0)
   button_init();
 
-  // 6. 初始化功放与音频 PWM (GPIO 4 / GPIO 26)
+  // 6. 初始化功放与音频 (GPIO 4 / GPIO 26)
   audio_init();
   audio_set_volume(settings_get().volume);
+  audio_set_eq((AudioEQMode)settings_get().eqMode);
 
   // 7. 初始化电池 ADC (GPIO 34)
   battery_init();

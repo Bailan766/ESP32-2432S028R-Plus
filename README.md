@@ -2,7 +2,7 @@
 
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-Compatible-orange.svg)](https://platformio.org/)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32--2432S028R--Plus-blue.svg)](docs/GPIO.md)
-[![Status](https://img.shields.io/badge/Version-v1.1.4-green.svg)](docs/CHANGELOG.md)
+[![Status](https://img.shields.io/badge/Version-v1.2.4-green.svg)](docs/CHANGELOG.md)
 [![Web Flasher](https://img.shields.io/badge/Web%20Flasher-Online%20Install-brightgreen.svg)](https://bailan766.github.io/ESP32-2432S028R-Plus/)
 
 基于 **ESP32-2432S028R Plus** 一体化电阻触屏开发板（CYD Plus）打造的开源、模块化、高可靠嵌入式便携式 MP3 播放器，兼具科技创新与智能硬件竞赛展示设计标准。

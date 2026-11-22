@@ -154,14 +154,14 @@
 #define GPS_BAUD_RATE     9600
 
 // ------------------------------------------------------------------------------
-// 颜色定义 (RGB565 格式，适配 TFT_eSPI)
+// 颜色定义 (RGB565 格式，Material Design 3 Dark Rose/Burgundy Dynamic Theme)
 // ------------------------------------------------------------------------------
-#define COLOR_BG_DARK     0x1082 // 极深灰黑
-#define COLOR_PANEL_BG    0x18E4 // 深蓝灰卡片底色
-#define COLOR_PANEL_BORDER 0x2146 // 卡片高光边框
-#define COLOR_ACCENT_CYAN 0x069F // 科技青蓝
-#define COLOR_ACCENT_GREEN 0x2E6E // 荧光绿
-#define COLOR_ACCENT_ORANGE 0xFBC0 // 亮橙色
-#define COLOR_TEXT_PRIMARY 0xF7BF // 白色主文本
-#define COLOR_TEXT_MUTED  0x8C94 // 暗灰次级文本
-#define COLOR_DANGER      0xF249 // 警告红
+#define COLOR_BG_DARK      0x1082 // #141012 M3 深暖黑底
+#define COLOR_PANEL_BG     0x20C3 // #221A1D M3 SurfaceContainer 暖梅灰卡片
+#define COLOR_PANEL_BORDER 0x2904 // #2D2226 M3 SurfaceContainerHigh 无细框色调分层
+#define COLOR_ACCENT_CYAN  0xF5F4 // #F2BFA4 M3 暖杏蜜桃 (Tertiary)
+#define COLOR_ACCENT_GREEN 0xA6B7 // #A7D7B8 M3 柔和莫兰迪鼠尾草绿
+#define COLOR_ACCENT_ORANGE 0xFD99 // #FFB1C8 M3 柔和暖粉主色调 (Primary)
+#define COLOR_TEXT_PRIMARY 0xF75D // #F7EBEE 暖白主文本
+#define COLOR_TEXT_MUTED   0xCD97 // #C8B4BA 暖灰次级文本
+#define COLOR_DANGER       0xFA6D // #FFB4AB M3 柔珊瑚告警色

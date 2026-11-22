@@ -18,3 +18,9 @@ void power_light_sleep(uint32_t ms);
 
 // 统计：本次开机累计浅睡眠时长（秒），用于诊断
 uint32_t power_get_sleep_seconds();
+
+// 睡眠定时停播（0=关闭，单位：分钟，如 15/30/60）
+void power_set_sleep_timer(uint16_t minutes);
+uint16_t power_cycle_sleep_timer();
+uint16_t power_get_sleep_timer_minutes();
+uint16_t power_get_sleep_timer_remaining_sec();

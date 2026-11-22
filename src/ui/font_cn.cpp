@@ -8010,16 +8010,20 @@ const uint8_t* font_find_glyph(uint16_t unicode) {
 
 void font_draw_char(int16_t x, int16_t y, uint16_t unicode, uint16_t color, uint16_t bg, uint8_t scale) {
   TFT_eSPI& tft = display_get_tft();
+  const bool transparent = (bg == color);
   const uint8_t* glyphData = font_find_glyph(unicode);
   if (!glyphData) {
-    tft.fillRect(x, y, 16 * scale, 16 * scale, bg);
+    if (!transparent) tft.fillRect(x, y, 16 * scale, 16 * scale, bg);
     tft.fillRect(x + 7 * scale, y + 7 * scale, 2 * scale, 2 * scale, color);
-
     return;
   }
 
   if (scale == 1) {
-    tft.drawBitmap(x, y, glyphData, 16, 16, color, bg);
+    if (transparent) {
+      tft.drawBitmap(x, y, glyphData, 16, 16, color);
+    } else {
+      tft.drawBitmap(x, y, glyphData, 16, 16, color, bg);
+    }
   } else {
     for (int r = 0; r < 16; r++) {
       uint8_t b0 = pgm_read_byte(glyphData + r * 2);
@@ -8027,8 +8031,11 @@ void font_draw_char(int16_t x, int16_t y, uint16_t unicode, uint16_t color, uint
       uint16_t row = ((uint16_t)b0 << 8) | b1;
       for (int c = 0; c < 16; c++) {
         bool on = (row >> (15 - c)) & 1;
-        uint16_t pixelColor = on ? color : bg;
-        tft.fillRect(x + c * scale, y + r * scale, scale, scale, pixelColor);
+        if (on) {
+          tft.fillRect(x + c * scale, y + r * scale, scale, scale, color);
+        } else if (!transparent) {
+          tft.fillRect(x + c * scale, y + r * scale, scale, scale, bg);
+        }
       }
     }
   }
@@ -8044,6 +8051,7 @@ void font_draw_string_clipped(int16_t x, int16_t y, int16_t maxW, const char* ut
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(1);
   tft.setTextSize(scale);
+  const bool transparent = (bg == color);
   int16_t curX = x;
   int16_t limitX = x + maxW;
   const uint8_t* p = (const uint8_t*)utf8_str;
@@ -8053,7 +8061,8 @@ void font_draw_string_clipped(int16_t x, int16_t y, int16_t maxW, const char* ut
       int16_t cw = (scale == 1 ? 9 : 18);
       if (curX + cw > limitX) break;
       char asciiCh = (char)*p;
-      tft.setTextColor(color, bg);
+      if (transparent) tft.setTextColor(color);
+      else tft.setTextColor(color, bg);
       tft.setTextSize(scale);
       tft.drawChar(asciiCh, curX, y, 2);
       curX += cw;
@@ -8148,6 +8157,11 @@ int16_t font_get_string_width(const char* utf8_str, uint8_t scale) {
     }
   }
   return w;
+}
+
+void font_draw_string_bold(int16_t x, int16_t y, int16_t maxW, const char* utf8_str, uint16_t color, uint16_t bg, uint8_t scale) {
+  font_draw_string_clipped(x, y, maxW, utf8_str, color, bg, scale);
+  font_draw_string_clipped(x + 1, y, maxW, utf8_str, color, color, scale);
 }
 
 void font_draw_string_center(int16_t cx, int16_t y, const char* utf8_str, uint16_t color, uint16_t bg, uint8_t scale) {

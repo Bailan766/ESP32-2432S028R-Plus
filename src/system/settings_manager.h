@@ -13,6 +13,11 @@ struct SystemSettings {
   bool bootCalibrate;        // 开机自动进入触屏校准 (默认 true, 适配安装外壳挤压)
   int lastTrackId;           // 上次播放的曲目 ID
   uint16_t lastPositionSec;  // 上次播放的进度秒数
+  uint8_t eqMode;            // 音效模式: 0=原声, 1=温暖低音, 2=清晰人声
+  bool clockAlwaysOn;        // 时钟界面常亮防息屏 (桌面摆件模式)
+  bool hourlyChime;          // 时钟整点轻鸣报时 (仅白天 8~22 点)
+  char weatherCityCode[12];  // 天气城市代码 (如 101110506 富平县)
+  char weatherCityName[20];  // 天气城市名称
 };
 
 void settings_init();

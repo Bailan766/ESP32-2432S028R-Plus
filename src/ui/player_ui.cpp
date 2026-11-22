@@ -6,6 +6,7 @@
 #include "hardware/display.h"
 #include "hardware/audio.h"
 #include "player/player.h"
+#include "system/settings_manager.h"
 
 #define SPEC_BARS 16
 static int s_specH[SPEC_BARS] = {0};
@@ -22,69 +23,56 @@ static void renderStaticElements() {
 
   ui_draw_header("正在播放", true);
 
-  // 1. 曲目信息卡片 (y: 34 ~ 80, h = 46)
+  // 1. M3 柔和粉玫瑰渐变曲目信息卡片 (y: 34 ~ 80, h = 46, r = 12)
   int16_t cardX = 10, cardY = 34, cardW = 300, cardH = 46;
-  tft.fillRoundRect(cardX, cardY, cardW, cardH, 6, UI_COL_SURFACE);
-  tft.drawRoundRect(cardX, cardY, cardW, cardH, 6, UI_COL_BORDER_SUBTLE);
+  ui_theme_draw_gradient_card(cardX, cardY, cardW, cardH, 12, M3_HERO_START, M3_HERO_END);
 
   const TrackInfo* t = player_get_current_track();
   bool playing = (player_get_state() == STATE_PLAYING);
 
-  // 左侧指示条
-  tft.fillRect(cardX + 2, cardY + 8, 3, cardH - 16, playing ? UI_COL_AMBER : UI_COL_BORDER_LIGHT);
+  // 左侧深酒红圆角音符图标
+  ui_theme_draw_icon_badge(cardX + 22, cardY + cardH / 2, 26, M3_ON_PRIMARY, M3_HERO_START, M3_ICON_NOTE, true);
 
-  // 曲目标题
+  // 高对比度深色粗体标题 + 副标题
   const char* songTitle = t && strlen(t->title) > 0 ? t->title : "未选择曲目";
-  font_draw_string_clipped(cardX + 16, cardY + 6, cardW - 24, songTitle, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+  font_draw_string_bold(cardX + 42, cardY + 6, cardW - 52, songTitle, M3_ON_PRIMARY, M3_ON_PRIMARY, 1);
 
-  // 格式与艺术家
   char sub[64];
-  snprintf(sub, sizeof(sub), "MP3 44.1kHz DAC2 | %s",
+  snprintf(sub, sizeof(sub), "I2S-DMA DAC2 · %s",
            (t && strlen(t->artist) > 0) ? t->artist : "本地音频");
-  font_draw_string_clipped(cardX + 16, cardY + 26, cardW - 24, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(cardX + 42, cardY + 25, cardW - 52, sub, M3_PRIMARY_CONTAINER, M3_PRIMARY_CONTAINER, 1);
   s_lastUiTrack = t;
   s_lastUiState = player_get_state();
 
-  // 2. 第一排主控按键 (y: 154 ~ 198, h = 44)
+  // 2. 第一排 M3 胶囊主控按键 (y: 152 ~ 200)
   // 上一曲 |< (x: 10, w: 56)
-  tft.fillRoundRect(10, 154, 56, 44, 6, UI_COL_SURFACE_HIGH);
-  tft.drawRoundRect(10, 154, 56, 44, 6, UI_COL_BORDER_LIGHT);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(UI_COL_TEXT_PRIMARY);
-  tft.drawString("|<", 38, 176, 4);
+  ui_theme_draw_badge(10, 154, 56, 44, "|<", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH);
 
-  // 播放 / 暂停 (Hero 按键: x: 74, w: 84)
-  tft.fillRoundRect(74, 152, 84, 48, 6, UI_COL_AMBER);
-  tft.drawRoundRect(74, 152, 84, 48, 6, UI_COL_TEXT_PRIMARY);
-  font_draw_string_center(116, 168, playing ? "暂停" : "播放", TFT_BLACK, UI_COL_AMBER, 1);
+  // Hero 播放 / 暂停 (M3 暖粉大胶囊: x: 74, w: 84, r: 22)
+  ui_theme_draw_badge(74, 152, 84, 48, playing ? "暂停" : "播放", M3_ON_PRIMARY, M3_PRIMARY);
 
   // 下一曲 >| (x: 166, w: 56)
-  tft.fillRoundRect(166, 154, 56, 44, 6, UI_COL_SURFACE_HIGH);
-  tft.drawRoundRect(166, 154, 56, 44, 6, UI_COL_BORDER_LIGHT);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(UI_COL_TEXT_PRIMARY);
-  tft.drawString(">|", 194, 176, 4);
+  ui_theme_draw_badge(166, 154, 56, 44, ">|", UI_COL_TEXT_PRIMARY, UI_COL_SURFACE_HIGH);
 
   // 循环模式切换 (x: 230, w: 80)
-  tft.fillRoundRect(230, 154, 80, 44, 6, UI_COL_SURFACE);
-  tft.drawRoundRect(230, 154, 80, 44, 6, UI_COL_BORDER_LIGHT);
   const char* mStr = "全部循环";
   if (player_get_mode() == MODE_REPEAT_ONE) mStr = "单曲循环";
   else if (player_get_mode() == MODE_SHUFFLE) mStr = "随机播放";
   else if (player_get_mode() == MODE_SEQUENTIAL) mStr = "顺序播放";
-  font_draw_string_center(270, 168, mStr, UI_COL_AMBER, UI_COL_SURFACE, 1);
+  ui_theme_draw_badge(230, 154, 80, 44, mStr, M3_PRIMARY, M3_PRIMARY_CONTAINER);
 
-  // 3. 第二排辅助控制按键 (y: 204 ~ 236, h = 32)
-  // -5s 快退 (x: 10, w: 68)
-  ui_theme_draw_pill_btn(10, 204, 68, 32, "快退 -5s", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+  // 3. 第二排辅助控制胶囊 (y: 204 ~ 236, h = 32)
+  ui_theme_draw_badge(10, 204, 66, 32, "快退 -5s", UI_COL_TEXT_MUTED, UI_COL_SURFACE);
 
-  // VOL 音量 (x: 86, w: 136)
-  char volBuf[32];
-  snprintf(volBuf, sizeof(volBuf), "音量: %d%%", audio_get_volume());
-  ui_theme_draw_pill_btn(86, 204, 136, 32, volBuf, UI_COL_CYAN, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+  char volBuf[20];
+  snprintf(volBuf, sizeof(volBuf), "音量:%d%%", audio_get_volume());
+  ui_theme_draw_badge(82, 204, 74, 32, volBuf, M3_TERTIARY, M3_TERTIARY_CONTAINER);
 
-  // +5s 快进 (x: 230, w: 80)
-  ui_theme_draw_pill_btn(230, 204, 80, 32, "快进 +5s", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+  char eqBuf[20];
+  snprintf(eqBuf, sizeof(eqBuf), "%s", audio_get_eq_name(audio_get_eq()));
+  ui_theme_draw_badge(162, 204, 62, 32, eqBuf, M3_SAGE, M3_SAGE_CONTAINER);
+
+  ui_theme_draw_badge(230, 204, 80, 32, "快进 +5s", UI_COL_TEXT_MUTED, UI_COL_SURFACE);
 
   tft.setTextDatum(TL_DATUM);
 }
@@ -108,20 +96,8 @@ static void updateProgressBar() {
   tft.setTextColor(UI_COL_TEXT_MUTED, UI_COL_BG);
   tft.drawString(timeBuf, 270, 132, 2);
 
-  // 进度条主体 (x: 58 ~ 260, 宽 202)
-  int barX = 58, barY = 138, barW = 202, barH = 4;
-  int prog = (int)((long)elapsed * barW / total);
-  prog = constrain(prog, 0, barW);
-
-  // 凹槽底轨
-  tft.fillRoundRect(barX, barY, barW, barH, 2, UI_COL_BORDER_SUBTLE);
-  // 已播放进度高亮
-  if (prog > 0) {
-    tft.fillRoundRect(barX, barY, prog, barH, 2, UI_COL_AMBER);
-  }
-  // 滑动圆点指示
-  tft.fillCircle(barX + prog, barY + 2, 4, UI_COL_TEXT_PRIMARY);
-  tft.drawCircle(barX + prog, barY + 2, 5, UI_COL_AMBER);
+  // M3 粗进度滑块主体 (x: 58 ~ 260, 宽 202)
+  ui_theme_draw_slider(58, 130, 202, (int16_t)elapsed, (int16_t)total, M3_PRIMARY);
 }
 
 // 复古 Hi-Fi LED 分段频谱分析仪 (带 Peak-Hold 峰值保持衰减)
@@ -132,15 +108,23 @@ static void updateVisualizer() {
   TFT_eSPI& tft = display_get_tft();
   int startX = 14, startY = 126, maxH = 40, barW = 14, gap = 4;
   uint16_t freq = player_get_current_note_freq();
+  uint8_t level = audio_stream_get_level();
   bool playing = (player_get_state() == STATE_PLAYING);
 
   for (int i = 0; i < SPEC_BARS; i++) {
     int targetH = 0;
-    if (playing && freq > 0) {
-      int center = (freq / 65) % SPEC_BARS;
-      int dist = abs(i - center);
-      int pulse = random(max(4, maxH - dist * 6), maxH);
-      targetH = constrain(pulse, 2, maxH);
+    if (playing) {
+      if (freq > 0) {
+        int center = (freq / 65) % SPEC_BARS;
+        int dist = abs(i - center);
+        int pulse = random(max(4, maxH - dist * 6), maxH);
+        targetH = constrain(pulse, 2, maxH);
+      } else {
+        int baseH = 4 + (level * (maxH - 6)) / 100;
+        int bandScale = (i < 4) ? 105 : ((i < 12) ? 95 : 80);
+        int jitter = random(-15, 25);
+        targetH = constrain((baseH * (bandScale + jitter)) / 100, 2, maxH);
+      }
     }
 
     if (s_specH[i] < targetH) {
@@ -165,15 +149,15 @@ static void updateVisualizer() {
       tft.fillRect(bx, startY - maxH, barW, maxH - h, UI_COL_BG);
     }
 
-    // 绘制 LED 分段块 (每块高 3px, 间隔 1px)
+    // 绘制 M3 暖玫瑰频谱分段块 (每块高 3px, 间隔 1px)
     int segH = 3, segGap = 1;
     int numSegs = h / (segH + segGap);
     for (int s = 0; s < numSegs; s++) {
       int segY = startY - (s + 1) * (segH + segGap);
       uint16_t segCol;
-      if (s < 5) segCol = UI_COL_GREEN;
-      else if (s < 8) segCol = UI_COL_AMBER;
-      else segCol = UI_COL_RED;
+      if (s < 4) segCol = M3_PRIMARY_CONTAINER;
+      else if (s < 7) segCol = M3_HERO_END;
+      else segCol = M3_HERO_START;
       tft.fillRect(bx, segY, barW, segH, segCol);
     }
 
@@ -188,7 +172,8 @@ static void updateVisualizer() {
     int totalH = 0;
     for (int i = 0; i < SPEC_BARS; i++) totalH += s_specH[i];
     uint8_t energy = constrain(map(totalH, 0, SPEC_BARS * 28, 20, 255), 0, 255);
-    rgb_beat_pulse(energy, freq);
+    uint16_t beatFreq = (freq > 0) ? freq : (uint16_t)(300 + level * 12);
+    rgb_beat_pulse(energy, beatFreq);
   }
 }
 
@@ -257,15 +242,24 @@ void player_ui_handle_touch(int16_t x, int16_t y) {
 
   // 4. 第二排控制按键 (y: 204~238)
   if (y >= 204 && y <= 238) {
-    if (x >= 8 && x <= 80) {
+    if (x >= 8 && x <= 78) {
       // 快退 -5s
       player_seek_offset(-5);
       updateProgressBar();
-    } else if (x >= 84 && x <= 224) {
-      // 循环调节音量: 30% -> 50% -> 70% -> 90% -> 100% -> 0%
+    } else if (x >= 80 && x <= 158) {
+      // 循环调节音量: 30% -> 50% -> 70% -> 90% -> 100% -> 30%
       uint8_t curVol = audio_get_volume();
       uint8_t nextVol = (curVol >= 100) ? 30 : (curVol + 20);
+      if (nextVol > 100) nextVol = 100;
       audio_set_volume(nextVol);
+      settings_get().volume = nextVol;
+      settings_save();
+      renderStaticElements();
+    } else if (x >= 160 && x <= 224) {
+      // 切换音效 EQ (原声 / 低音 / 人声)
+      AudioEQMode eq = audio_cycle_eq();
+      settings_get().eqMode = (uint8_t)eq;
+      settings_save();
       renderStaticElements();
     } else if (x >= 226 && x <= 312) {
       // 快进 +5s

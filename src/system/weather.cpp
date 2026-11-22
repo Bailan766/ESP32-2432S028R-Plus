@@ -1,4 +1,5 @@
 #include "weather.h"
+#include "settings_manager.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
@@ -63,13 +64,19 @@ static const char* translateCondition(const char* raw) {
   return raw;
 }
 
-// 方案 1 (首选核心): 国内天气专用 CDN (又拍云/itboy) - 直连陕西省渭南市富平县，免 Key，超低延迟 (<200ms)
+// 方案 1 (首选核心): 国内天气专用 CDN (又拍云/itboy) - 支持 NVS 自定义城市代码，免 Key，超低延迟
 static bool fetchViaChinaWeather() {
   HTTPClient http;
   http.setTimeout(4000);
 
-  // 101110506 = 陕西省 渭南市 富平县
-  http.begin("http://t.weather.itboy.net/api/weather/city/101110506");
+  const char* cfgCode = settings_get().weatherCityCode;
+  const char* cfgName = settings_get().weatherCityName;
+  const char* cityCode = (cfgCode && strlen(cfgCode) >= 5) ? cfgCode : FUPING_CITY_CODE;
+  const char* cityName = (cfgName && strlen(cfgName) > 0) ? cfgName : FUPING_CITY_NAME;
+
+  char url[96];
+  snprintf(url, sizeof(url), "http://t.weather.itboy.net/api/weather/city/%s", cityCode);
+  http.begin(url);
   http.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
 
   int code = http.GET();
@@ -96,7 +103,7 @@ static bool fetchViaChinaWeather() {
       if (city && strlen(city) > 0) {
         strncpy(s_weather.city, city, sizeof(s_weather.city) - 1);
       } else {
-        strncpy(s_weather.city, FUPING_CITY_NAME, sizeof(s_weather.city) - 1);
+        strncpy(s_weather.city, cityName, sizeof(s_weather.city) - 1);
       }
       s_weather.city[sizeof(s_weather.city) - 1] = '\0';
 

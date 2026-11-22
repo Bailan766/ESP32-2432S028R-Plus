@@ -17,8 +17,8 @@ static void renderList() {
 
   ui_draw_header("文墨书架", true);
 
-  // 顶部右上角添加 [重扫] 按钮
-  ui_theme_draw_pill_btn(154, 4, 58, 22, "重扫", UI_COL_AMBER, UI_COL_SURFACE_HIGH, UI_COL_BORDER_SUBTLE);
+  // 顶部右上角 M3 胶囊重扫按钮
+  ui_theme_draw_badge(154, 4, 58, 22, "重扫", M3_PRIMARY, M3_PRIMARY_CONTAINER);
 
   int totalBooks = novel_get_count();
   int totalPages = (totalBooks + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE;
@@ -37,59 +37,54 @@ static void renderList() {
 
     if (bookIdx < totalBooks) {
       const NovelItem* book = novel_get_item(bookIdx);
-      tft.fillRoundRect(x, y, w, h, 6, UI_COL_SURFACE);
-      tft.drawRoundRect(x, y, w, h, 6, UI_COL_BORDER_SUBTLE);
+      bool hasRead = (book->last_offset > 0);
+      ui_theme_draw_panel(x, y, w, h, 12, UI_COL_SURFACE, UI_COL_SURFACE);
 
-      // 左侧指示条
-      tft.fillRect(x + 2, y + 8, 3, h - 16, book->last_offset > 0 ? UI_COL_AMBER : UI_COL_BORDER_LIGHT);
+      // 左侧 M3 柔和图标底衬
+      ui_theme_draw_icon_badge(x + 21, y + h / 2, 26,
+                               hasRead ? M3_PRIMARY_CONTAINER : M3_TERTIARY_CONTAINER,
+                               hasRead ? M3_PRIMARY : M3_TERTIARY,
+                               M3_ICON_BOOK, hasRead);
 
-      // 书名 (支持中文点阵)
-      font_draw_string_clipped(x + 14, y + 6, w - 24, book->title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+      // 粗体书名
+      font_draw_string_bold(x + 40, y + 6, w - 46, book->title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
 
       // 来源与容量
       char infoBuf[32];
       if (book->is_demo) {
-        snprintf(infoBuf, sizeof(infoBuf), "内置演示 (%.1f KB)", (float)book->file_size / 1024.0f);
+        snprintf(infoBuf, sizeof(infoBuf), "内置演示 · %.0fK", (float)book->file_size / 1024.0f);
+      } else if (book->file_size > 1024 * 1024) {
+        snprintf(infoBuf, sizeof(infoBuf), "TF卡 · %.1fM", (float)book->file_size / (1024.0f * 1024.0f));
       } else {
-        if (book->file_size > 1024 * 1024) {
-          snprintf(infoBuf, sizeof(infoBuf), "TF卡 (%.1f MB)", (float)book->file_size / (1024.0f * 1024.0f));
-        } else {
-          snprintf(infoBuf, sizeof(infoBuf), "TF卡 (%u KB)", book->file_size / 1024);
-        }
+        snprintf(infoBuf, sizeof(infoBuf), "TF卡 · %uK", book->file_size / 1024);
       }
-      font_draw_string_clipped(x + 14, y + 26, 190, infoBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+      font_draw_string_clipped(x + 40, y + 25, 160, infoBuf, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 
-      // 历史阅读进度
+      // 右侧阅读进度胶囊徽章
       char progBuf[24];
-      if (book->last_offset == 0) {
-        strcpy(progBuf, "未读");
+      if (!hasRead) {
+        ui_theme_draw_badge(x + w - 58, y + 22, 50, 18, "未读", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH);
       } else {
         float p = ((float)book->last_offset / (float)book->file_size) * 100.0f;
-        snprintf(progBuf, sizeof(progBuf), "已读 %.1f%%", constrain(p, 0.0f, 100.0f));
+        snprintf(progBuf, sizeof(progBuf), "%.0f%%", constrain(p, 0.0f, 100.0f));
+        ui_theme_draw_badge(x + w - 58, y + 22, 50, 18, progBuf, M3_PRIMARY, M3_PRIMARY_CONTAINER);
       }
-      font_draw_string(x + 210, y + 26, progBuf, book->last_offset > 0 ? UI_COL_AMBER : UI_COL_TEXT_DIM, UI_COL_SURFACE, 1);
     } else {
-      // 空位占位
-      tft.fillRoundRect(x, y, w, h, 6, UI_COL_SURFACE);
-      tft.drawRoundRect(x, y, w, h, 6, UI_COL_BORDER_SUBTLE);
+      ui_theme_draw_panel(x, y, w, h, 12, UI_COL_SURFACE, UI_COL_SURFACE);
       font_draw_string_center(160, y + 16, "- 暂无更多书籍 -", UI_COL_TEXT_DIM, UI_COL_SURFACE, 1);
     }
   }
 
-  // 底部翻页栏
-  tft.drawLine(0, 192, 320, 192, UI_COL_BORDER_SUBTLE);
+  // M3 悬浮胶囊翻页栏 (y: 196, h: 36, r: 18)
+  tft.fillRoundRect(10, 196, 300, 36, 18, UI_COL_SURFACE_HIGH);
+  ui_theme_draw_badge(15, 200, 88, 28, "< 上页", (s_listPage > 0) ? UI_COL_TEXT_PRIMARY : UI_COL_TEXT_DIM, UI_COL_SURFACE_PRESS);
 
-  // [上页]
-  ui_theme_draw_pill_btn(12, 196, 84, 36, "< 上页", (s_listPage > 0) ? UI_COL_TEXT_PRIMARY : UI_COL_TEXT_DIM, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
-
-  // 页码显示
   char pageBuf[24];
   snprintf(pageBuf, sizeof(pageBuf), "%d / %d", s_listPage + 1, totalPages);
-  font_draw_string_center(160, 206, pageBuf, UI_COL_AMBER, UI_COL_BG, 1);
+  ui_theme_draw_badge(126, 200, 68, 28, pageBuf, M3_PRIMARY, M3_PRIMARY_CONTAINER);
 
-  // [下页]
   bool hasNext = (s_listPage < totalPages - 1);
-  ui_theme_draw_pill_btn(224, 196, 84, 36, "下页 >", hasNext ? UI_COL_TEXT_PRIMARY : UI_COL_TEXT_DIM, UI_COL_SURFACE, UI_COL_BORDER_SUBTLE);
+  ui_theme_draw_badge(217, 200, 88, 28, "下页 >", hasNext ? UI_COL_TEXT_PRIMARY : UI_COL_TEXT_DIM, UI_COL_SURFACE_PRESS);
 }
 
 void novel_list_enter() {

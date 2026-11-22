@@ -7,16 +7,14 @@
 #include "config.h"
 
 static void renderGameCard(int16_t x, int16_t y, int16_t w, int16_t h,
-                           const char* title, const char* sub, uint16_t dotCol) {
-  TFT_eSPI& tft = display_get_tft();
-  tft.fillRoundRect(x, y, w, h, 6, UI_COL_SURFACE);
-  tft.drawRoundRect(x, y, w, h, 6, UI_COL_BORDER_SUBTLE);
+                           const char* title, const char* sub,
+                           uint16_t iconBg, uint16_t iconFg,
+                           M3IconType icon, bool scalloped) {
+  ui_theme_draw_panel(x, y, w, h, 12, UI_COL_SURFACE, UI_COL_SURFACE);
+  ui_theme_draw_icon_badge(x + 21, y + h / 2, 26, iconBg, iconFg, icon, scalloped);
 
-  // 左侧微圆点指示器
-  tft.fillCircle(x + 12, y + 14, 3, dotCol);
-
-  font_draw_string(x + 22, y + 7, title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
-  font_draw_string(x + 22, y + 26, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
+  font_draw_string_bold(x + 40, y + 6, w - 44, title, UI_COL_TEXT_PRIMARY, UI_COL_SURFACE, 1);
+  font_draw_string_clipped(x + 40, y + 25, w - 44, sub, UI_COL_TEXT_MUTED, UI_COL_SURFACE, 1);
 }
 
 static void renderGameMenu() {
@@ -25,28 +23,26 @@ static void renderGameMenu() {
 
   ui_draw_header("极客功能大厅", true);
 
-  // 1. 卡片 0: 网络收音机 (Row 0, Col 0: x=12, y=36, w=144, h=48)
-  renderGameCard(12, 36, 144, 48, "网络收音机", "在线流媒体电台", UI_COL_AMBER);
+  // 1. 卡片 0: 网络收音机
+  renderGameCard(12, 36, 144, 48, "网络收音", "在线电台", M3_PRIMARY_CONTAINER, M3_PRIMARY, M3_ICON_RADIO, true);
 
-  // 2. 卡片 1: 空中传歌/书 (Row 0, Col 1: x=164, y=36, w=144, h=48)
-  renderGameCard(164, 36, 144, 48, "空中传歌/书", "局域网拖拽直传", UI_COL_CYAN);
+  // 2. 卡片 1: 空中传歌/书
+  renderGameCard(164, 36, 144, 48, "空中传书", "遥控与传歌", M3_TERTIARY_CONTAINER, M3_TERTIARY, M3_ICON_SD, false);
 
-  // 3. 卡片 2: 蓝牙音箱 (Row 1, Col 0: x=12, y=89, w=144, h=48)
-  renderGameCard(12, 89, 144, 48, "蓝牙音箱", "手机无线推歌", UI_COL_CYAN);
+  // 3. 卡片 2: 蓝牙音箱
+  renderGameCard(12, 89, 144, 48, "蓝牙音箱", "无线推流", M3_SECONDARY_CONTAINER, M3_PRIMARY, M3_ICON_BT, false);
 
-  // 4. 卡片 3: 电子木鱼 (Row 1, Col 1: x=164, y=89, w=144, h=48)
-  renderGameCard(164, 89, 144, 48, "电子木鱼", "功德+1 自动积攒", UI_COL_AMBER);
+  // 4. 卡片 3: 电子木鱼
+  renderGameCard(164, 89, 144, 48, "电子木鱼", "功德自动攒", M3_TERTIARY_CONTAINER, M3_TERTIARY, M3_ICON_NOTE, true);
 
-  // 5. 卡片 4: 2048 经典 (Row 2, Col 0: x=12, y=142, w=144, h=48)
-  renderGameCard(12, 142, 144, 48, "2048 经典", "滑屏数字消除", UI_COL_GREEN);
+  // 5. 卡片 4: 2048 经典
+  renderGameCard(12, 142, 144, 48, "2048游戏", "数字滑屏", M3_SAGE_CONTAINER, M3_SAGE, M3_ICON_GAME, false);
 
-  // 6. 卡片 5: 复古翻页钟 (Row 2, Col 1: x=164, y=142, w=144, h=48)
-  renderGameCard(164, 142, 144, 48, "复古翻页钟", "拟物机械桌面摆件", UI_COL_TEXT_PRIMARY);
+  // 6. 卡片 5: 复古翻页钟
+  renderGameCard(164, 142, 144, 48, "桌面时钟", "翻页摆件", M3_PRIMARY_CONTAINER, M3_PRIMARY, M3_ICON_CLOCK, true);
 
-  // 底部信息条 (y: 196, h: 34)
-  tft.fillRoundRect(12, 196, 296, 34, 6, UI_COL_SURFACE);
-  tft.drawRoundRect(12, 196, 296, 34, 6, UI_COL_BORDER_SUBTLE);
-  font_draw_string_center(160, 204, "极客玩物 · 摆烂摸鱼，快乐至上", UI_COL_TEXT_DIM, UI_COL_SURFACE, 1);
+  // M3 悬浮胶囊信息栏 (y: 196, h: 34, r: 17)
+  ui_theme_draw_badge(12, 196, 296, 34, "Material You · 极客摆件工作台", UI_COL_TEXT_MUTED, UI_COL_SURFACE_HIGH);
 }
 
 void game_menu_enter() {

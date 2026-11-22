@@ -11,6 +11,7 @@
 #include "radio/web_radio.h"
 #include "system/net_manager.h"
 #include "ui/font_cn.h"
+#include "ui/ui.h"
 #include "config.h"
 #include <WiFi.h>
 #include <esp_sleep.h>
@@ -18,6 +19,8 @@
 
 static unsigned long s_lastActivityTime = 0;
 static uint32_t s_sleepMsAccum = 0;   // 累计浅睡眠时长，用于诊断
+static uint16_t s_sleepTimerMinutes = 0;
+static unsigned long s_sleepTimerEndMs = 0;
 
 // 当前 CPU 频率（MHz）。ESP32 默认 240MHz，是待机功耗的主要来源之一。
 static uint8_t s_cpuMhz = 240;
@@ -121,6 +124,38 @@ uint32_t power_get_sleep_seconds() {
   return s_sleepMsAccum / 1000;
 }
 
+void power_set_sleep_timer(uint16_t minutes) {
+  s_sleepTimerMinutes = minutes;
+  if (minutes == 0) {
+    s_sleepTimerEndMs = 0;
+    LOG_SYS("睡眠定时已关闭");
+  } else {
+    s_sleepTimerEndMs = millis() + (unsigned long)minutes * 60000UL;
+    LOG_SYS("睡眠定时已设定: %u 分钟后自动停播息屏", (unsigned)minutes);
+  }
+}
+
+uint16_t power_cycle_sleep_timer() {
+  uint16_t next = 0;
+  if (s_sleepTimerMinutes == 0) next = 15;
+  else if (s_sleepTimerMinutes <= 15) next = 30;
+  else if (s_sleepTimerMinutes <= 30) next = 60;
+  else next = 0;
+  power_set_sleep_timer(next);
+  return next;
+}
+
+uint16_t power_get_sleep_timer_minutes() {
+  return s_sleepTimerMinutes;
+}
+
+uint16_t power_get_sleep_timer_remaining_sec() {
+  if (s_sleepTimerMinutes == 0 || s_sleepTimerEndMs == 0) return 0;
+  long remMs = (long)(s_sleepTimerEndMs - millis());
+  if (remMs <= 0) return 0;
+  return (uint16_t)(remMs / 1000L);
+}
+
 // ------------------------------------------------------------------------------
 // 低电量保护
 //
@@ -200,6 +235,27 @@ void power_update() {
   // 0. 低电量保护（优先级最高，独立于息屏策略）
   batteryGuardUpdate();
 
+  // 0.5 睡眠定时停播检查
+  if (s_sleepTimerMinutes > 0 && s_sleepTimerEndMs > 0 &&
+      (long)(millis() - s_sleepTimerEndMs) >= 0) {
+    LOG_SYS("睡眠定时到期 (%u 分钟)，自动停止所有音频并息屏", (unsigned)s_sleepTimerMinutes);
+    s_sleepTimerMinutes = 0;
+    s_sleepTimerEndMs = 0;
+    player_stop();
+    if (web_radio_is_playing()) web_radio_stop();
+    if (bt_sink_is_active()) {
+      bt_sink_stop();
+      if (ui_get_current_page() == UI_PAGE_BLUETOOTH_SINK) {
+        ui_switch_to(UI_PAGE_LOCKSCREEN);
+      }
+    }
+    audio_stop();
+    amp_disable();
+    rgb_set_state(RGB_OFF);
+    display_sleep();
+    return;
+  }
+
   // 1. CPU 频率自适应
   if (player_get_state() == STATE_PLAYING || bt_sink_is_active() || web_radio_is_playing() || audio_is_playing()) {
     applyCpuFreq(CPU_PLAYING_MHZ);
@@ -220,7 +276,11 @@ void power_update() {
     s_rgbOffForSleep = false;
   }
 
-  // 3. 自动息屏倒计时
+  // 3. 自动息屏倒计时（桌面时钟常亮开启时在时钟页保持常亮）
+  if (ui_get_current_page() == UI_PAGE_LOCKSCREEN && settings_get().clockAlwaysOn) {
+    return;
+  }
+
   uint16_t timeoutSec = settings_get().autoSleepSeconds;
   if (timeoutSec == 0) return; // 0 表示从不息屏
 
