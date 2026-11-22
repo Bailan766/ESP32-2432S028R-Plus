@@ -540,6 +540,11 @@
     </div>
 
     <div class="faq-item">
+      <div class="faq-q">Q: 提示 "Failed to execute 'open' on 'SerialPort': The port is already open."？</div>
+      <div class="faq-a">说明当前浏览器标签页中上一次串口连接尚未释放（例如中途关闭了烧录弹窗或重复点击了连接按钮）。页面已内置自动关闭重连逻辑；若仍提示占用，请按 <strong>F5 / Ctrl+R 刷新网页</strong>后再点击烧录。</div>
+    </div>
+
+    <div class="faq-item">
       <div class="faq-q">Q: 烧录完成后如何验证？</div>
       <div class="faq-a">烧录达到 100% 后，芯片会自动软复位，2 秒内屏幕即亮起播放器主控界面。插上 FAT32 格式 TF 卡拷入 MP3 即可开始畅听。</div>
     </div>
@@ -564,6 +569,25 @@ function selectManifest(manifestFile, type) {
 
 if (!('serial' in navigator)) {
   document.getElementById('unsupported-alert').style.display = 'block';
+} else if (typeof SerialPort !== 'undefined') {
+  var origSerialOpen = SerialPort.prototype.open;
+  SerialPort.prototype.open = async function(options) {
+    try {
+      return await origSerialOpen.call(this, options);
+    } catch (err) {
+      if (err && (err.name === 'InvalidStateError' || String(err.message || '').indexOf('already open') !== -1)) {
+        try {
+          await this.close();
+          return await origSerialOpen.call(this, options);
+        } catch (_) {
+          alert('检测到当前浏览器标签页中的串口仍处于打开状态，即将自动刷新页面以释放串口，刷新后请再次点击烧录。');
+          location.reload();
+          return;
+        }
+      }
+      throw err;
+    }
+  };
 }
 
 (function initThreeScene() {
