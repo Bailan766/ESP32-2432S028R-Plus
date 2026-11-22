@@ -247,7 +247,11 @@
         <div class="faq-a">这是因为引导区为空或串口处于复位死循环中。<strong>解决方法极度简单</strong>：<br>按住开发板背面的 <strong>BOOT 按键不要松开</strong>，用指甲按一下旁边的 <strong>RST/EN 复位按键</strong>，再松开 BOOT 键。此时板子将稳定停留在下载等待模式，关闭正在占用串口的串口助手/监视器，刷新本网页重新点击「开始连接并刷入」即可 100% 修复！</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">Q3: 刷完之后怎么用？</div>
+        <div class="faq-q">Q3: 提示 "Failed to execute 'open' on 'SerialPort': The port is already open."？</div>
+        <div class="faq-a">表示当前浏览器标签页上一次串口会话尚未完全释放（例如中途关闭了刷机弹窗或重复点击连接）。网页已内置自动重连释放逻辑；若仍提示占用，请直接按 <strong>F5 / Ctrl+R 刷新当前网页</strong>（并确认未打开其它串口助手或刷机标签页）后再点击刷入。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Q4: 刷完之后怎么用？</div>
         <div class="faq-a">烧录进度到达 100% 后，ESP32 会自动软复位进入系统。首次开机将在 2.5 秒内自动展示启动画面并进入主屏。插上 TF 卡（格式化为 FAT32）并拷入 MP3 即可开听。</div>
       </div>
     </div>
@@ -260,6 +264,25 @@
   <script>
     if (!('serial' in navigator)) {
       document.getElementById('unsupported-alert').style.display = 'block';
+    } else if (typeof SerialPort !== 'undefined') {
+      const origOpen = SerialPort.prototype.open;
+      SerialPort.prototype.open = async function(options) {
+        try {
+          return await origOpen.call(this, options);
+        } catch (err) {
+          if (err && (err.name === 'InvalidStateError' || String(err.message || '').includes('already open'))) {
+            try {
+              await this.close();
+              return await origOpen.call(this, options);
+            } catch (_) {
+              alert('检测到当前浏览器标签页中的串口仍处于打开状态，即将自动刷新页面以释放串口，刷新后请再次点击烧录。');
+              location.reload();
+              return;
+            }
+          }
+          throw err;
+        }
+      };
     }
   </script>
 </body>
